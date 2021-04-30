@@ -364,7 +364,7 @@ void BarrierSetAssembler::nmethod_entry_barrier(MacroAssembler* masm, Label* slo
 
     __ bind(local_guard);
 
-    __ emit_int32(0);   // nmethod guard value. Skipped over in common case.
+  __ emit_int32(0);   // nmethod guard value. Skipped over in common case.
   } else {
     __ bind(*continuation);
   }
