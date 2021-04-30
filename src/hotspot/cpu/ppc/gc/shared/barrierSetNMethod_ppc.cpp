@@ -138,3 +138,12 @@ int BarrierSetNMethod::arm_value(nmethod* nm) {
   NativeNMethodBarrier* barrier = get_nmethod_barrier(nm);
   return barrier->get_guard_value();
 }
+
+int BarrierSetNMethod::arm_value(nmethod* nm) {
+  if (!supports_entry_barrier(nm)) {
+    return 0;
+  }
+
+  NativeNMethodBarrier* barrier = get_nmethod_barrier(nm);
+  return barrier->get_guard_value();
+}
