@@ -1,0 +1,2136 @@
+zAddress.cpp:  // Check max supported heap size
+zAddress.inline.hpp:    // Accept raw NULL
+zAddress.inline.hpp:    // Null is valid
+zAddress.inline.hpp:    // Must have a heap base bit
+zAddress.inline.hpp:    // No low order bits
+zAddress.inline.hpp:  // Checking if an address is "not bad" is an optimized version of
+zAddress.inline.hpp:  // checking if it's "good or null", which eliminates an explicit
+zAddress.inline.hpp:  // null check. However, the implicit null check only checks that
+zAddress.inline.hpp:  // the mask bits are zero, not that the entire address is zero.
+zAddress.inline.hpp:  // This means that an address without mask bits would pass through
+zAddress.inline.hpp:  // the barrier as if it was null. This should be harmless as such
+zAddress.inline.hpp:  // addresses should ever be passed through the barrier.
+zAddress.inline.hpp:  // Checking if an address is "not bad" is an optimized version of
+zAddress.inline.hpp:  // checking if it's "good or null", which eliminates an explicit
+zAddress.inline.hpp:  // null check. However, the implicit null check only checks that
+zAddress.inline.hpp:  // the mask bits are zero, not that the entire address is zero.
+zAddress.inline.hpp:  // This means that an address without mask bits would pass through
+zAddress.inline.hpp:  // the barrier as if it was null. This should be harmless as such
+zAddress.inline.hpp:  // addresses should ever be passed through the barrier.
+zAddress.inline.hpp:  // Checking if an address is "not bad" is an optimized version of
+zAddress.inline.hpp:  // checking if it's "good or null", which eliminates an explicit
+zAddress.inline.hpp:  // null check. However, the implicit null check only checks that
+zAddress.inline.hpp:  // the mask bits are zero, not that the entire address is zero.
+zAddress.inline.hpp:  // This means that an address without mask bits would pass through
+zAddress.inline.hpp:  // the barrier as if it was null. This should be harmless as such
+zAddress.inline.hpp:  // addresses should ever be passed through the barrier.
+zAddressSpaceLimit.cpp:  // No limit
+zAddressSpaceLimit.cpp:  // Allow mark stacks to occupy 10% of the address space
+zAddressSpaceLimit.cpp:  // Allow the heap to occupy 50% of the address space
+zAllocator.hpp:  // Mutator allocation
+zAllocator.hpp:  // Statistics
+zAllocator.hpp:  // Relocation
+zArguments.cpp:  // Check mark stack size
+zArguments.cpp:  // Enable NUMA by default
+zArguments.cpp:  // Select number of parallel threads
+zArguments.cpp:  // Select number of concurrent threads
+zArguments.cpp:      // Reduce the number of object ages, if the resulting garbage is too high
+zArguments.cpp:  // Large page size must match granule size
+zArguments.cpp:  // The heuristics used when UseDynamicNumberOfGCThreads is
+zArguments.cpp:  // enabled defaults to using a ZAllocationSpikeTolerance of 1.
+zArguments.cpp:  // Enable loop strip mining by default
+zArguments.cpp:  // CompressedOops not supported
+zArguments.cpp:  // More events
+zArguments.cpp:  // Verification before startup and after exit not (yet) supported
+zArguments.cpp:  // This check slows down testing too much. Turn it off for now.
+zArray.inline.hpp:      // Fully deactivated - remove all elements
+zArray.inline.hpp:  // Apply function to all elements - if fully deactivated
+zAttachedArray.inline.hpp:  // Allocate memory for object and array
+zAttachedArray.inline.hpp:  // Placement new array
+zAttachedArray.inline.hpp:  // Return pointer to object
+zBarrier.cpp:    // Young gen objects are never blocked, need to keep alive
+zBarrier.cpp:  // Strongly live
+zBarrier.cpp:    // Young gen objects are never blocked, need to keep alive
+zBarrier.cpp:  // Strongly live
+zBarrier.cpp:    // Young objects are never considered non-strong
+zBarrier.cpp:    // Note: Should not need to keep object alive in this operation,
+zBarrier.cpp:    //       but the barrier colors the pointer mark good, so we need
+zBarrier.cpp:    //       to mark the object accordingly.
+zBarrier.cpp:    // Young objects are never considered non-strong
+zBarrier.cpp:    // Note: Should not need to keep object alive in this operation,
+zBarrier.cpp:    //       but the barrier colors the pointer mark good, so we need
+zBarrier.cpp:    //       to mark the object accordingly.
+zBarrier.cpp:  // Verify that the object was indeed alive
+zBarrier.cpp:  // Mark
+zBarrier.cpp:  // Mark
+zBarrier.cpp:  // Mark
+zBarrier.cpp:    // Buffer store barriers whenever possible
+zBarrier.hpp:  // Fast paths in increasing strength level
+zBarrier.hpp:  // Slow paths
+zBarrier.hpp:  // Helpers for non-strong oop refs barriers
+zBarrier.hpp:  // Verification
+zBarrier.hpp:  // Helpers for relocation
+zBarrier.hpp:  // Helpers for marking
+zBarrier.hpp:  // Load barrier
+zBarrier.hpp:  // Load barriers on non-strong oop refs
+zBarrier.hpp:  // Reference processor / weak cleaning barriers
+zBarrier.hpp:  // Mark barrier
+zBarrier.hpp:  // Store barrier
+zBarrier.inline.hpp:    // Null is good enough at this point
+zBarrier.inline.hpp:    // Never heal with null since it interacts badly with reference processing.
+zBarrier.inline.hpp:    // A mutator clearing an oop would be similar to calling Reference.clear(),
+zBarrier.inline.hpp:    // which would make the reference non-discoverable or silently dropped
+zBarrier.inline.hpp:    // by the reference processor.
+zBarrier.inline.hpp:    // Heal
+zBarrier.inline.hpp:      // Success
+zBarrier.inline.hpp:      // Must not self heal
+zBarrier.inline.hpp:    // The oop location was healed by another barrier, but still needs upgrading.
+zBarrier.inline.hpp:    // Re-apply healing to make sure the oop is not left with weaker (remapped or
+zBarrier.inline.hpp:    // finalizable) metadata bits than what this barrier tried to apply.
+zBarrier.inline.hpp:  // Double remap bad - the pointer is neither old load good nor
+zBarrier.inline.hpp:  // young load good. First the code ...
+zBarrier.inline.hpp:  // ... then the explanation. Time to put your seat belt on.
+zBarrier.inline.hpp:  // In this context we only have access to the ptr (colored oop), but we
+zBarrier.inline.hpp:  // don't know if this refers to a stale young gen or old gen object.
+zBarrier.inline.hpp:  // However, by being careful with when we run young and old collections,
+zBarrier.inline.hpp:  // and by explicitly remapping roots we can figure this out by looking
+zBarrier.inline.hpp:  // at the metadata bits in the pointer.
+zBarrier.inline.hpp:  // *Roots (including remset)*:
+zBarrier.inline.hpp:  //
+zBarrier.inline.hpp:  // will never have double remap bit errors,
+zBarrier.inline.hpp:  // and will never enter this path. The reason is that there's always a
+zBarrier.inline.hpp:  // phase that remaps all roots between all relocation phases:
+zBarrier.inline.hpp:  //
+zBarrier.inline.hpp:  // 1) Young marking remaps the roots, before the young relocation runs
+zBarrier.inline.hpp:  //
+zBarrier.inline.hpp:  // 2) The old roots_remap phase blocks out young collections and runs just
+zBarrier.inline.hpp:  //    before old relocation starts
+zBarrier.inline.hpp:  // *Heap object fields*:
+zBarrier.inline.hpp:  //
+zBarrier.inline.hpp:  // could have double remap bit errors, and may enter this path. We are using
+zBarrier.inline.hpp:  // knowledge about the how *remember* bits are to narrow down the
+zBarrier.inline.hpp:  // possibilities.
+zBarrier.inline.hpp:  // Short summary:
+zBarrier.inline.hpp:  //
+zBarrier.inline.hpp:  // If both remember bits are set, when we have a double
+zBarrier.inline.hpp:  // remap bit error, then we know that we are dealing with
+zBarrier.inline.hpp:  // an old-to-old pointer.
+zBarrier.inline.hpp:  //
+zBarrier.inline.hpp:  // Otherwise, we are dealing with a young-to-any pointer,
+zBarrier.inline.hpp:  // and the address that contained the pointed-to object, is
+zBarrier.inline.hpp:  // guaranteed to have only been used by either the young gen
+zBarrier.inline.hpp:  // or the old gen.
+zBarrier.inline.hpp:  // Longer explanation:
+zBarrier.inline.hpp:  // Double remap bad pointers in young gen:
+zBarrier.inline.hpp:  //
+zBarrier.inline.hpp:  // After young relocation, the young gen objects were promoted to old gen,
+zBarrier.inline.hpp:  // and we keep track of those old-to-young pointers via the remset
+zBarrier.inline.hpp:  // (described above in the roots section).
+zBarrier.inline.hpp:  //
+zBarrier.inline.hpp:  // However, when young marking started, the current set of young gen objects
+zBarrier.inline.hpp:  // are snapshotted, and subsequent allocations end up in the next young
+zBarrier.inline.hpp:  // collection. Between young mark start, and young relocate start, stores
+zBarrier.inline.hpp:  // can happen to either the "young allocating" objects, or objects that
+zBarrier.inline.hpp:  // are about to become survivors. For both survivors and young-allocating
+zBarrier.inline.hpp:  // objects, it is true that their zpointers will be store good when
+zBarrier.inline.hpp:  // young marking finishes, and can not get demoted. These pointers will become
+zBarrier.inline.hpp:  // young remap bad after young relocate start. We don't maintain a remset
+zBarrier.inline.hpp:  // for the young allocating objects, so we don't have the same guarantee as
+zBarrier.inline.hpp:  // we have for roots (including remset). Pointers in these objects are
+zBarrier.inline.hpp:  // therefore therefore susceptible to become double remap bad.
+zBarrier.inline.hpp:  //
+zBarrier.inline.hpp:  // The scenario that can happen is:
+zBarrier.inline.hpp:  //   - Store in young allocating or future survivor happens between young mark
+zBarrier.inline.hpp:  //     start and young relocate start
+zBarrier.inline.hpp:  //   - Young relocate start makes this pointer young remap bad
+zBarrier.inline.hpp:  //   - It is NOT fixed in roots_remap (it is not part of the remset or roots)
+zBarrier.inline.hpp:  //   - Old relocate start makes this pointer also old remap bad
+zBarrier.inline.hpp:  // Double remap bad pointers in old gen:
+zBarrier.inline.hpp:  //
+zBarrier.inline.hpp:  // When an object is promoted, all oop*s are added to the remset. (Could
+zBarrier.inline.hpp:  // have either double or single remember bits at this point)
+zBarrier.inline.hpp:  //
+zBarrier.inline.hpp:  // As long as we have a remset entry for the oop*, we ensure that the pointer
+zBarrier.inline.hpp:  // is not double remap bad. See the roots section.
+zBarrier.inline.hpp:  //
+zBarrier.inline.hpp:  // However, at some point the GC notices that the pointer points to an old
+zBarrier.inline.hpp:  // object, and that there's no need for a remset entry. Because of that,
+zBarrier.inline.hpp:  // the young collection will not visit the pointer, and the pointer can
+zBarrier.inline.hpp:  // become double remap bad.
+zBarrier.inline.hpp:  //
+zBarrier.inline.hpp:  // The scenario that can happen is:
+zBarrier.inline.hpp:  //   - Old marking visits the object
+zBarrier.inline.hpp:  //   - Old relocation starts and then young relocation starts
+zBarrier.inline.hpp:  //      or
+zBarrier.inline.hpp:  //   - Young relocation starts and then old relocation starts
+zBarrier.inline.hpp:  // About double *remember* bits:
+zBarrier.inline.hpp:  //
+zBarrier.inline.hpp:  // Whenever we:
+zBarrier.inline.hpp:  // - perform a store barrier, we heal with one remember bit.
+zBarrier.inline.hpp:  // - mark objects in young gen, we heal with one remember bit.
+zBarrier.inline.hpp:  // - perform a non-store barrier outside of young gen, we heal with
+zBarrier.inline.hpp:  //   double remember bits.
+zBarrier.inline.hpp:  // - "remset forget" a pointer in an old object, we heal with double
+zBarrier.inline.hpp:  //   remember bits.
+zBarrier.inline.hpp:  //
+zBarrier.inline.hpp:  // Double remember bits ensures that *every* store that encounters it takes
+zBarrier.inline.hpp:  // a slow path.
+zBarrier.inline.hpp:  //
+zBarrier.inline.hpp:  // If we encounter a pointer that is both double remap bad *and* has double
+zBarrier.inline.hpp:  // remember bits, we know that it can't be young and it has to be old!
+zBarrier.inline.hpp:  //
+zBarrier.inline.hpp:  // Pointers in young objects:
+zBarrier.inline.hpp:  //
+zBarrier.inline.hpp:  // The only double remap bad young pointers are inside "young allocating"
+zBarrier.inline.hpp:  // objects and survivors, as described above. When such a pointer was written
+zBarrier.inline.hpp:  // into the young allocating memory, or marked in young gen, the pointer was
+zBarrier.inline.hpp:  // remap good and the store/young mark barrier healed with a single remember bit.
+zBarrier.inline.hpp:  // No other barrier could replace that bit, because store good is the greatest
+zBarrier.inline.hpp:  // barrier, and all other barriers will take the fast-path. This is true until
+zBarrier.inline.hpp:  // the young relocation starts.
+zBarrier.inline.hpp:  //
+zBarrier.inline.hpp:  // After the young relocation has started, the pointer became young remap
+zBarrier.inline.hpp:  // bad, and maybe we even started an old relocaton, and the pointer became
+zBarrier.inline.hpp:  // double remap bad. When the next load barrier triggers, it will self heal
+zBarrier.inline.hpp:  // with double remember bits, but *importantly* it will at the same time
+zBarrier.inline.hpp:  // heal with good remap bits.
+zBarrier.inline.hpp:  //
+zBarrier.inline.hpp:  // So, if we have entered this "double remap bad" path, and the pointer was
+zBarrier.inline.hpp:  // located in young gen, then it was young allocating or a survivor, and it
+zBarrier.inline.hpp:  // must only have one remember bit set!
+zBarrier.inline.hpp:  //
+zBarrier.inline.hpp:  // Pointers in old objects:
+zBarrier.inline.hpp:  //
+zBarrier.inline.hpp:  // When pointers become forgotten, they are tagged with double remembered
+zBarrier.inline.hpp:  // bits. Only way to convert the pointer into having only one remembered
+zBarrier.inline.hpp:  // bit, is to perform a store. When that happens, the pointer becomes both
+zBarrier.inline.hpp:  // remap good and remembered again, and will be handled as the roots
+zBarrier.inline.hpp:  // described above.
+zBarrier.inline.hpp:  // With the above information:
+zBarrier.inline.hpp:  //
+zBarrier.inline.hpp:  // Iff we find a double remap bad pointer with *double remember bits*,
+zBarrier.inline.hpp:  // then we know that it is an old-to-old pointer, and we should use the
+zBarrier.inline.hpp:  // forwarding table of the old generation.
+zBarrier.inline.hpp:  //
+zBarrier.inline.hpp:  // Iff we find a double remap bad pointer with a *single remember bit*,
+zBarrier.inline.hpp:  // then we know that it is a young-to-any pointer. We still don't know
+zBarrier.inline.hpp:  // if the pointed-to object is young or old.
+zBarrier.inline.hpp:  // Figuring out if a double remap bad pointer in young pointed at
+zBarrier.inline.hpp:  // young or old:
+zBarrier.inline.hpp:  //
+zBarrier.inline.hpp:  // The scenario that created a double remap bad pointer in the young
+zBarrier.inline.hpp:  // allocating or survivor memory is that it was written during the last
+zBarrier.inline.hpp:  // young marking before the old relocation started. At that point, the old
+zBarrier.inline.hpp:  // generation collection has already taken its marking snapshot, and
+zBarrier.inline.hpp:  // determined what pages will be marked and therefore eligible to become
+zBarrier.inline.hpp:  // part of the old relocation set. If the young generation relocated/freed
+zBarrier.inline.hpp:  // a page (address range), and that address range was then reused for an old
+zBarrier.inline.hpp:  // page, it won't be part of the old snapshot and it therefore won't be
+zBarrier.inline.hpp:  // selected for old relocation.
+zBarrier.inline.hpp:  //
+zBarrier.inline.hpp:  // Because of this, we know that the object written into the young
+zBarrier.inline.hpp:  // allocating page will at most belong to one of the two relocation sets,
+zBarrier.inline.hpp:  // and we can therefore simply check in which table we installed
+zBarrier.inline.hpp:  // ZForwarding.
+zBarrier.inline.hpp:  // Fast path
+zBarrier.inline.hpp:  // Make load good
+zBarrier.inline.hpp:  // Slow path
+zBarrier.inline.hpp:  // Self heal
+zBarrier.inline.hpp:    // Color
+zBarrier.inline.hpp:  // Make load good
+zBarrier.inline.hpp:  // Color
+zBarrier.inline.hpp:  // No need to do anything
+zBarrier.inline.hpp:    // Don't down-grade pointers
+zBarrier.inline.hpp:  // Normal load barrier doesn't keep the object alive
+zBarrier.inline.hpp:  // Normal load barrier doesn't keep the object alive
+zBarrier.inline.hpp:  // The referent in a FinalReference should never be cleared by the GC. Instead
+zBarrier.inline.hpp:  // it should just be healed (as if it was a phantom oop) and this function should
+zBarrier.inline.hpp:  // return true if the object pointer to by the referent is not strongly reachable.
+zBarrier.inline.hpp:    // During marking, we mark through already marked oops to avoid having
+zBarrier.inline.hpp:    // some large part of the object graph hidden behind a pushed, but not
+zBarrier.inline.hpp:    // yet flushed, entry on a mutator mark stack. Always marking through
+zBarrier.inline.hpp:    // allows the GC workers to proceed through the object graph even if a
+zBarrier.inline.hpp:    // mutator touched an oop first, which in turn will reduce the risk of
+zBarrier.inline.hpp:    // having to flush mark stacks multiple times to terminate marking.
+zBarrier.inline.hpp:    //
+zBarrier.inline.hpp:    // However, when doing finalizable marking we don't always want to mark
+zBarrier.inline.hpp:    // through. First, marking through an already strongly marked oop would
+zBarrier.inline.hpp:    // be wasteful, since we will then proceed to do finalizable marking on
+zBarrier.inline.hpp:    // an object which is, or will be, marked strongly. Second, marking
+zBarrier.inline.hpp:    // through an already finalizable marked oop would also be wasteful,
+zBarrier.inline.hpp:    // since such oops can never end up on a mutator mark stack and can
+zBarrier.inline.hpp:    // therefore not hide some part of the object graph from GC workers.
+zBarrier.inline.hpp:    // Make the oop finalizable marked/good, instead of normal marked/good.
+zBarrier.inline.hpp:    // This is needed because an object might first becomes finalizable
+zBarrier.inline.hpp:    // marked by the GC, and then loaded by a mutator thread. In this case,
+zBarrier.inline.hpp:    // the mutator thread must be able to tell that the object needs to be
+zBarrier.inline.hpp:    // strongly marked. The finalizable bit in the oop exists to make sure
+zBarrier.inline.hpp:    // that a load of a finalizable marked oop will fall into the barrier
+zBarrier.inline.hpp:    // slow path so that we can mark the object as strongly reachable.
+zBarrier.inline.hpp:    // Note: that this does not color the pointer finalizable marked if it
+zBarrier.inline.hpp:    // is already colored marked old good.
+zBarrier.inline.hpp:  // Objects that get promoted to the old generation, must invariantly contain
+zBarrier.inline.hpp:  // only store good pointers. However, the young marking code above filters
+zBarrier.inline.hpp:  // out null pointers, so we need to explicitly ensure even null pointers are
+zBarrier.inline.hpp:  // store good, before objects may get promoted (and before relocate start).
+zBarrier.inline.hpp:  // This barrier ensures that.
+zBarrier.inline.hpp:  // This could simply be ensured in the marking above, but promotion rates
+zBarrier.inline.hpp:  // are typically rather low, and fixing all null pointers strictly, when
+zBarrier.inline.hpp:  // only a few had to be store good due to promotions, is generally not favourable
+zBarrierSet.cpp:  //assert((decorators & ON_UNKNOWN_OOP_REF) == 0, "Unexpected decorator");
+zBarrierSet.cpp:    // Barrier needed even when IN_NATIVE, to allow concurrent scanning.
+zBarrierSet.cpp:  // Barrier not needed
+zBarrierSet.cpp:  // Create thread local data
+zBarrierSet.cpp:  // Destroy thread local data
+zBarrierSet.cpp:  // Set thread local masks
+zBarrierSet.cpp:  // Flush and free any remaining mark stacks
+zBarrierSet.cpp:      // We promised C2 that its allocations would end up in young gen. This object
+zBarrierSet.cpp:      // breaks that promise. Take a few steps in the interpreter instead, which has
+zBarrierSet.cpp:      // no such assumptions about where an object resides.
+zBarrierSet.hpp:    //
+zBarrierSet.hpp:    // In heap
+zBarrierSet.hpp:    //
+zBarrierSet.hpp:    //
+zBarrierSet.hpp:    // Not in heap
+zBarrierSet.hpp:    //
+zBarrierSet.inline.hpp:      // Load barriers on strong oop refs don't keep objects alive
+zBarrierSet.inline.hpp:      // Load barriers on strong oop refs don't keep objects alive
+zBarrierSet.inline.hpp:    // No store barrier
+zBarrierSet.inline.hpp:    // No store barrier
+zBarrierSet.inline.hpp:  // Through Unsafe.CompareAndExchangeObject()/CompareAndSetObject() we can receive
+zBarrierSet.inline.hpp:  // calls with ON_UNKNOWN_OOP_REF set. However, we treat these as ON_STRONG_OOP_REF,
+zBarrierSet.inline.hpp:  // with the motivation that if you're doing Unsafe operations on a Reference.referent
+zBarrierSet.inline.hpp:  // field, then you're on your own anyway.
+zBarrierSet.inline.hpp:    // Check cast failed
+zBarrierSet.inline.hpp:  // Check cast and copy each elements
+zBarrierSet.inline.hpp:      // Check cast failed
+zBarrierSet.inline.hpp:  // src and dst are the same; nothing to do
+zBarrierSet.inline.hpp:  // Fix the oops
+zBarrierSet.inline.hpp:  // Clone the object
+zBarrierSet.inline.hpp:  // Color store good before handing out
+zBarrierSetNMethod.cpp:    // Some other thread got here first and healed the oops
+zBarrierSetNMethod.cpp:    // and disarmed the nmethod.
+zBarrierSetNMethod.cpp:    // We don't need to take the lock when unlinking nmethods from
+zBarrierSetNMethod.cpp:    // the Method, because it is only concurrently unlinked by
+zBarrierSetNMethod.cpp:    // the entry barrier, which acquires the per nmethod lock.
+zBarrierSetNMethod.cpp:    // We can end up calling nmethods that are unloading
+zBarrierSetNMethod.cpp:    // since we clear compiled ICs lazily. Returning false
+zBarrierSetNMethod.cpp:    // will re-resovle the call and update the compiled IC.
+zBarrierSetNMethod.cpp:  // Heal barriers
+zBarrierSetNMethod.cpp:  // Heal oops
+zBarrierSetNMethod.cpp:  // Disarm
+zBarrierSetRuntime.cpp:      // Normal loads on strong oop never keep objects alive
+zBitMap.inline.hpp:      // Someone else beat us to it
+zBitMap.inline.hpp:      // Success
+zBitMap.inline.hpp:    // The value changed, retry
+zCollectedHeap.cpp:  // Not supported
+zCollectedHeap.cpp:  // Start asynchronous GC
+zCollectedHeap.cpp:  // Expand and retry allocation
+zCollectedHeap.cpp:  // As a last resort, try a critical allocation, riding on a synchronous full GC
+zCollectedHeap.cpp:  // Handle external collection requests
+zCollectedHeap.cpp:    // Start Minor GC
+zCollectedHeap.cpp:    // Start Major GC
+zCollectedHeap.cpp:  // These collection requests are ignored since ZGC can't run a synchronous
+zCollectedHeap.cpp:  // GC cycle from within the VM thread. This is considered benign, since the
+zCollectedHeap.cpp:  // only GC causes coming in here should be heap dumper and heap inspector.
+zCollectedHeap.cpp:  // However, neither the heap dumper nor the heap inspector really need a GC
+zCollectedHeap.cpp:  // to happen, but the result of their heap iterations might in that case be
+zCollectedHeap.cpp:  // less accurate since they might include objects that would otherwise have
+zCollectedHeap.cpp:  // been collected by a GC.
+zCollectedHeap.cpp:  // Not supported
+zCollectedHeap.cpp:  // Colored null requires us to apply load barrier before checking against null.
+zCollectedHeap.cpp:  // Does nothing
+zCollectedHeap.cpp:  // Fake values. ZGC does not commit memory contiguously in the reserved
+zCollectedHeap.cpp:  // address space, and the reserved space is larger than MaxHeapSize.
+zCollectedHeap.cpp:  // Does nothing
+zCollectedHeap.cpp:  // Does nothing
+zCPU.cpp:  // Set current thread
+zCPU.cpp:  // Set current CPU
+zCPU.cpp:  // Update affinity table
+zCPU.inline.hpp:  // Fast path
+zCPU.inline.hpp:  // Slow path
+zDirector.cpp:    // Rule disabled
+zDirector.cpp:  // Perform GC if timer has expired.
+zDirector.cpp:  // Use all workers until we're warm
+zDirector.cpp:  // Calculate number of GC workers needed to avoid OOM.
+zDirector.cpp:    // Before decreasing number of GC workers compared to the previous GC cycle, check if the
+zDirector.cpp:    // next GC cycle will need to increase it again. If so, use the same number of GC workers
+zDirector.cpp:    // that will be needed in the next cycle.
+zDirector.cpp:    // Add 0.5 to increase friction and avoid lowering too eagerly
+zDirector.cpp:    // Rule disabled
+zDirector.cpp:  // Calculate amount of free memory available. Note that we take the
+zDirector.cpp:  // relocation headroom into account to avoid in-place relocation.
+zDirector.cpp:  // Calculate time until OOM given the max allocation rate and the amount
+zDirector.cpp:  // of free memory. The allocation rate is a moving average and we multiply
+zDirector.cpp:  // that with an allocation spike tolerance factor to guard against unforeseen
+zDirector.cpp:  // phase changes in the allocate rate. We then add ~3.3 sigma to account for
+zDirector.cpp:  // the allocation rate variance, which means the probability is 1 in 1000
+zDirector.cpp:  // that a sample is outside of the confidence interval.
+zDirector.cpp:  // Calculate max serial/parallel times of a GC cycle. The times are
+zDirector.cpp:  // moving averages, we add ~3.3 sigma to account for the variance.
+zDirector.cpp:  // Calculate number of GC workers needed to avoid OOM.
+zDirector.cpp:  // Convert to a discrete number of GC workers within limits.
+zDirector.cpp:  // Calculate GC duration given number of GC workers needed.
+zDirector.cpp:  // Calculate time until GC given the time until OOM and GC duration.
+zDirector.cpp:  // Bail out if we are not "close" to needing the GC to start yet, where
+zDirector.cpp:  // close is 5% of the time left until OOM. If we don't check that we
+zDirector.cpp:  // are "close", then the heuristics instead add more threads and we
+zDirector.cpp:  // end up not triggering GCs until we have the max number of threads.
+zDirector.cpp:    // Rule disabled
+zDirector.cpp:  // Perform GC if the estimated max allocation rate indicates that we
+zDirector.cpp:  // will run out of memory. The estimated max allocation rate is based
+zDirector.cpp:  // on the moving average of the sampled allocation rate plus a safety
+zDirector.cpp:  // margin based on variations in the allocation rate and unforeseen
+zDirector.cpp:  // allocation spikes.
+zDirector.cpp:  // Calculate amount of free memory available. Note that we take the
+zDirector.cpp:  // relocation headroom into account to avoid in-place relocation.
+zDirector.cpp:  // Calculate time until OOM given the max allocation rate and the amount
+zDirector.cpp:  // of free memory. The allocation rate is a moving average and we multiply
+zDirector.cpp:  // that with an allocation spike tolerance factor to guard against unforeseen
+zDirector.cpp:  // phase changes in the allocate rate. We then add ~3.3 sigma to account for
+zDirector.cpp:  // the allocation rate variance, which means the probability is 1 in 1000
+zDirector.cpp:  // that a sample is outside of the confidence interval.
+zDirector.cpp:  // Calculate max serial/parallel times of a GC cycle. The times are
+zDirector.cpp:  // moving averages, we add ~3.3 sigma to account for the variance.
+zDirector.cpp:  // Calculate GC duration given number of GC workers needed.
+zDirector.cpp:  // Calculate time until GC given the time until OOM and max duration of GC.
+zDirector.cpp:  // We also deduct the sample interval, so that we don't overshoot the target
+zDirector.cpp:  // time and end up starting the GC too late in the next interval.
+zDirector.cpp:    // Rule disabled
+zDirector.cpp:    // Don't collect young if we have threads stalled waiting for an old collection
+zDirector.cpp:    // Rule disabled
+zDirector.cpp:  // Perform GC if the amount of free memory is 5% or less. This is a preventive
+zDirector.cpp:  // meassure in the case where the application has a very low allocation rate,
+zDirector.cpp:  // such that the allocation rate rule doesn't trigger, but the amount of free
+zDirector.cpp:  // memory is still slowly but surely heading towards zero. In this situation,
+zDirector.cpp:  // we start a GC cycle to avoid a potential allocation stall later.
+zDirector.cpp:  // Calculate amount of free memory available. Note that we take the
+zDirector.cpp:  // relocation headroom into account to avoid in-place relocation.
+zDirector.cpp:    // Rule disabled
+zDirector.cpp:  // Perform GC if timer has expired.
+zDirector.cpp:    // Rule disabled
+zDirector.cpp:    // Rule disabled
+zDirector.cpp:  // Perform GC if heap usage passes 10/20/30% and no other GC has been
+zDirector.cpp:  // performed yet. This allows us to get some early samples of the GC
+zDirector.cpp:  // duration, which is needed by the other rules.
+zDirector.cpp:  // Calculate amount of free memory available. Note that we take the
+zDirector.cpp:  // relocation headroom into account to avoid in-place relocation.
+zDirector.cpp:  // Calculate max serial/parallel times of a young GC cycle. The times are
+zDirector.cpp:  // moving averages, we add ~3.3 sigma to account for the variance.
+zDirector.cpp:  // Calculate young GC time and duration given number of GC workers needed.
+zDirector.cpp:  // Calculate how much memory young collections are predicted to free.
+zDirector.cpp:  // Since young collections are not instant, we have to start them
+zDirector.cpp:  // before running out of memory, so that the application can allocate
+zDirector.cpp:  // while the GC works. In a back-to-back scenario, the ratio of
+zDirector.cpp:  // allocated bytes vs reclaimed bytes is typically 50-50. Therefore
+zDirector.cpp:  // the freeable bytes per young GC is typically half of the theoretically
+zDirector.cpp:  // ultimate case of young collections being instant. This is an
+zDirector.cpp:  // approximation of the truth. More exact estimations of allocation
+zDirector.cpp:  // rate might yield more precise heuristics when we don't back-to-back
+zDirector.cpp:  // collect the young generation.
+zDirector.cpp:  // Calculate current YC time and predicted YC time after an old collection.
+zDirector.cpp:  // Calculate extra time per young collection inflicted by *not* doing an
+zDirector.cpp:  // old collection that frees up memory in the old generation.
+zDirector.cpp:    // Rule disabled
+zDirector.cpp:  // Calculate max serial/parallel times of an old GC cycle. The times are
+zDirector.cpp:  // moving averages, we add ~3.3 sigma to account for the variance.
+zDirector.cpp:  // Calculate old GC time.
+zDirector.cpp:  // Calculate extra time per young collection inflicted by *not* doing an
+zDirector.cpp:  // old collection that frees up memory in the old generation.
+zDirector.cpp:  // Doing an old collection makes subsequent young collections more efficient.
+zDirector.cpp:  // Calculate the number of young collections ahead that we will try to amortize
+zDirector.cpp:  // the cost of doing an old collection for.
+zDirector.cpp:  // Calculate extra young collection overhead predicted for a number of future
+zDirector.cpp:  // young collections, due to not freeing up memory in the old generation.
+zDirector.cpp:  // If we continue doing as many minor collections as we already did since the
+zDirector.cpp:  // last major collection (N), without doing a major collection, then the minor
+zDirector.cpp:  // GC effort of freeing up memory for another N cycles, plus the effort of doing,
+zDirector.cpp:  // a major GC combined, is lower compared to the extra GC overhead per minor
+zDirector.cpp:  // collection, freeing an equal amount of memory, at a higher GC frequency.
+zDirector.cpp:  // In other words, the cost for minor collections of not doing a major collection
+zDirector.cpp:  // will seemingly be greater than the cost of doing a major collection and getting
+zDirector.cpp:  // cheaper minor collections for a time to come.
+zDirector.cpp:  // Calculate max serial/parallel times of an old collection. The times
+zDirector.cpp:  // are moving averages, we add ~3.3 sigma to account for the variance.
+zDirector.cpp:  // Calculate max serial/parallel times of a young collection. The times
+zDirector.cpp:  // are moving averages, we add ~3.3 sigma to account for the variance.
+zDirector.cpp:  // Calculate GC duration given number of GC workers needed.
+zDirector.cpp:  // Calculate how much amortized extra young GC time can be reduced by
+zDirector.cpp:  // putting an equal amount of GC time towards finishing old faster instead.
+zDirector.cpp:    // Rule disabled
+zDirector.cpp:    // Rule disabled
+zDirector.cpp:    // Rule disabled
+zDirector.cpp:  // Perform GC if the impact of doing so, in terms of application throughput
+zDirector.cpp:  // reduction, is considered acceptable. This rule allows us to keep the heap
+zDirector.cpp:  // size down and allow reference processing to happen even when we have a lot
+zDirector.cpp:  // of free space on the heap.
+zDirector.cpp:  // Only consider doing a proactive GC if the heap usage has grown by at least
+zDirector.cpp:  // 10% of the max capacity since the previous GC, or more than 5 minutes has
+zDirector.cpp:  // passed since the previous GC. This helps avoid superfluous GCs when running
+zDirector.cpp:  // applications with very low allocation rate.
+zDirector.cpp:    // Don't even consider doing a proactive GC
+zDirector.cpp:    // Collection is not running
+zDirector.cpp:    // No urgency
+zDirector.cpp:    // Collection is not running
+zDirector.cpp:    // No urgency
+zDirector.cpp:    // Need at least 1 thread for old generation
+zDirector.cpp:    // Adjust old threads so we don't have more than ConcGCThreads in total
+zDirector.cpp:    // Need to change major workers
+zDirector.cpp:    // We need more workers than we currently use; trigger worker resize
+zDirector.cpp:  // Force old generation to yield threads if it has too many
+zDirector.cpp:  // Try start major collections first as they include a minor collection
+zDirector.cpp:      // Merge minor GC into major GC
+zDirector.cpp:    // Stopped
+zDirector.cpp:  // Wait
+zDirector.cpp:  // Main loop
+zDriver.cpp:    // Start asynchronous GC
+zDriver.cpp:    // Select number of worker threads to use
+zDriver.cpp:  // Main loop
+zDriver.cpp:    // Wait for GC request
+zDriver.cpp:    // Run GC
+zDriver.cpp:    // Notify GC completed
+zDriver.cpp:    // Handle allocation stalls
+zDriver.cpp:    // Good point to consider back-to-back GC
+zDriver.cpp:  // Clear soft references if implied by the GC cause
+zDriver.cpp:  // Clear soft references if threads are stalled waiting for an old collection
+zDriver.cpp:  // Don't clear
+zDriver.cpp:  // Preclean young if implied by the GC cause
+zDriver.cpp:  // Preclean young if threads are stalled waiting for an old collection
+zDriver.cpp:  // Preclean young if implied by configuration
+zDriver.cpp:    // Start synchronous GC
+zDriver.cpp:    // Start asynchronous GC
+zDriver.cpp:    // Set up soft reference policy
+zDriver.cpp:    // Select number of worker threads to use
+zDriver.cpp:    // Update data used by soft reference policy
+zDriver.cpp:    // Signal that we have completed a visit to all live objects
+zDriver.cpp:    // Collect young generation and promote everything to old generation
+zDriver.cpp:  // Collect young generation and gather roots pointing into old generation
+zDriver.cpp:  // Handle allocations waiting for a young collection
+zDriver.cpp:  // Collect old generation
+zDriver.cpp:  // Main loop
+zDriver.cpp:    // Wait for GC request
+zDriver.cpp:    // Run GC
+zDriver.cpp:    // Notify GC completed
+zDriver.cpp:    // Handle allocation stalls
+zDriverPort.cpp:    // Enqueue message
+zDriverPort.cpp:  // Wait for completion
+zDriverPort.cpp:    // Guard deletion of underlying semaphore. This is a workaround for a
+zDriverPort.cpp:    // bug in sem_post() in glibc < 2.21, where it's not safe to destroy
+zDriverPort.cpp:    // the semaphore immediately after returning from sem_wait(). The
+zDriverPort.cpp:    // reason is that sem_post() can touch the semaphore after a waiting
+zDriverPort.cpp:    // thread have returned from sem_wait(). To avoid this race we are
+zDriverPort.cpp:    // forcing the waiting thread to acquire/release the lock held by the
+zDriverPort.cpp:    // posting thread. https://sourceware.org/bugzilla/show_bug.cgi?id=12674
+zDriverPort.cpp:    // Post message
+zDriverPort.cpp:  // Wait for message
+zDriverPort.cpp:  // Increment request sequence number
+zDriverPort.cpp:    // Message available in the queue
+zDriverPort.cpp:    // Nothing to ack
+zDriverPort.cpp:  // Satisfy requests (and duplicates) in queue
+zDriverPort.cpp:      // Dequeue and satisfy request. Note that the dequeue operation must
+zDriverPort.cpp:      // happen first, since the request will immediately be deallocated
+zDriverPort.cpp:      // once it has been satisfied.
+zDriverPort.cpp:    // Queue is empty
+zDriverPort.cpp:    // Post first message in queue
+zDriverPort.hpp:  // For use by sender
+zDriverPort.hpp:  // For use by receiver
+zForwarding.cpp:  // Support for ZHeap::is_in checks of from-space objects
+zForwarding.cpp:  // in a page that is in-place relocating
+zForwarding.cpp:    // The old to old relocation reused the ZPage
+zForwarding.cpp:    // It took ownership of clearing and updating the remset up to,
+zForwarding.cpp:    // and including, the last from object. Clear the rest.
+zForwarding.cpp:    // Only do this for non-promoted pages, that still need to reset live map.
+zForwarding.cpp:    // Done with iterating over the "from-page" view, so can now drop the _livemap.
+zForwarding.cpp:  // Disable relaxed ZHeap::is_in checks
+zForwarding.cpp:  // Only the relocating thread is allowed to know about the old relocation top.
+zForwarding.cpp:      // Released
+zForwarding.cpp:      // Claimed
+zForwarding.cpp:      // Retained
+zForwarding.cpp:    // Invert reference count
+zForwarding.cpp:    // If the previous reference count was 1, then we just changed it to -1,
+zForwarding.cpp:    // and we have now claimed the page. Otherwise we wait until it is claimed.
+zForwarding.cpp:    // Done
+zForwarding.cpp:      // Decrement reference count
+zForwarding.cpp:      // If the previous reference count was 1, then we just decremented
+zForwarding.cpp:      // it to 0 and we should signal that the page is now released.
+zForwarding.cpp:        // Notify released
+zForwarding.cpp:      // Increment reference count
+zForwarding.cpp:      // If the previous reference count was -2 or -1, then we just incremented it
+zForwarding.cpp:      // to -1 or 0, and we should signal the that page is now claimed or released.
+zForwarding.cpp:        // Notify claimed or released
+zForwarding.cpp:  // Wait until released
+zForwarding.cpp:  // Invariant: page is being retained
+zForwarding.cpp:  // The OC has relocated all objects and collected all fields that
+zForwarding.cpp:  // used to have remembered set entries. Now publish the fields to
+zForwarding.cpp:  // the YC.
+zForwarding.cpp:  // 0: OK to publish
+zForwarding.cpp:  // 1: Not possible - this operation makes this transition
+zForwarding.cpp:  // 2: YC started scanning the "from" page concurrently and rejects the fields
+zForwarding.cpp:  //    the OC collected.
+zForwarding.cpp:  // 3: YC accepted the fields published by this function - not possible
+zForwarding.cpp:  //    because they weren't published before the CAS above
+zForwarding.cpp:    // fields were successfully published
+zForwarding.cpp:  // 2: YC scans the remset concurrently
+zForwarding.cpp:  // 3: YC accepted published remset - not possible, we just atomically published it
+zForwarding.cpp:  //    YC failed to retain page - not possible, since the current page is retainable
+zForwarding.cpp:  // YC has rejected the stored values and will (or have already) find them them itself
+zForwarding.cpp:  // Invariant: The page is being retained
+zForwarding.cpp:  // 0: OC has not completed relocation
+zForwarding.cpp:  // 1: OC has completed and published all relocated remembered fields
+zForwarding.cpp:  // 2: A previous YC has already handled the field
+zForwarding.cpp:  // 3: A previous YC has determined that there's no concurrency between
+zForwarding.cpp:  //    OC relocation and YC remembered fields scanning - not possible
+zForwarding.cpp:  //    since the page has been retained (still being relocated) and
+zForwarding.cpp:  //    we are in the process of scanning fields
+zForwarding.cpp:    // Successfully notified and rejected any collected data from the OC
+zForwarding.cpp:    // OC relocation already collected and published fields
+zForwarding.cpp:    // TODO: Consider using this information instead of throwing it away?
+zForwarding.cpp:    // Still notify concurrent scanning and reject the collected data from the OC
+zForwarding.cpp:    // The YC rejected the publish fields and is responsible for the array
+zForwarding.cpp:    // Eagerly deallocate the memory
+zForwarding.cpp:  // Previous YC already handled the remembered fields
+zForwarding.cpp:      // Skip empty entries
+zForwarding.cpp:    // Check from index
+zForwarding.cpp:    // Check for duplicates
+zForwarding.cpp:        // Skip empty entries
+zForwarding.cpp:  // Verify number of live objects and bytes
+zForwarding.hpp:  // Relocated remembered set fields support
+zForwarding.hpp:  // In-place relocation support
+zForwarding.hpp:  // Debugging
+zForwarding.hpp:  // Visit from-objects
+zForwarding.hpp:  // Visit to-objects
+zForwarding.hpp:  // In-place relocation support
+zForwarding.hpp:  // Relocated remembered set fields support
+zForwarding.inline.hpp:  // The number returned by the function is used to size the hash table of
+zForwarding.inline.hpp:  // forwarding entries for this page. This hash table uses linear probing.
+zForwarding.inline.hpp:  // The size of the table must be a power of two to allow for quick and
+zForwarding.inline.hpp:  // inexpensive indexing/masking. The table is also sized to have a load
+zForwarding.inline.hpp:  // factor of 50%, i.e. sized to have double the number of entries actually
+zForwarding.inline.hpp:  // inserted, to allow for good lookup/insert performance.
+zForwarding.inline.hpp:    // Find to-object
+zForwarding.inline.hpp:    // Apply function
+zForwarding.inline.hpp:      // Skip empty entries
+zForwarding.inline.hpp:    // Find to-object
+zForwarding.inline.hpp:    // Apply function
+zForwarding.inline.hpp:    // The original objects are not available anymore, can't use the livemap
+zForwarding.inline.hpp:  // Load acquire for correctness with regards to
+zForwarding.inline.hpp:  // accesses to the contents of the forwarded object.
+zForwarding.inline.hpp:  // Reading entries in the table races with the atomic CAS done for
+zForwarding.inline.hpp:  // insertion into the table. This is safe because each entry is at
+zForwarding.inline.hpp:  // most updated once (from zero to something else).
+zForwarding.inline.hpp:      // Match found, return matching entry
+zForwarding.inline.hpp:  // Match not found, return empty entry
+zForwarding.inline.hpp:  // Make sure that object copy is finished
+zForwarding.inline.hpp:  // before forwarding table installation
+zForwarding.inline.hpp:      // Success
+zForwarding.inline.hpp:    // Find next empty or matching entry
+zForwarding.inline.hpp:        // Match found, return already inserted address
+zForwarding.inline.hpp:  // Invariant: Page is being retained
+zForwarding.inline.hpp:  // 0: Gather remembered fields
+zForwarding.inline.hpp:  // 1: Have already published fields - not possible since they haven't been
+zForwarding.inline.hpp:  //    collected yet
+zForwarding.inline.hpp:  // 2: YC rejected fields collected by the OC
+zForwarding.inline.hpp:  // 3: YC has marked that there's no more concurrent scanning of relocated
+zForwarding.inline.hpp:  //    fields - not possible since this code is still relocating objects
+zForwarding.inline.hpp:  // Invariant: Page is not being retained
+zForwarding.inline.hpp:  // 0: Nothing published - page had already been relocated before YC started
+zForwarding.inline.hpp:  // 1: OC relocated and published relocated remembered fields
+zForwarding.inline.hpp:  // 2: A previous YC concurrently scanned relocated remembered fields of the "from" page
+zForwarding.inline.hpp:  // 3: A previous YC marked that it didn't do (2)
+zForwarding.inline.hpp:    // OC published relocated remembered fields
+zForwarding.inline.hpp:    // YC responsible for the array - eagerly deallocate
+zForwardingTable.inline.hpp:  // Medium sized pages the same forwarding installed as multiple consecutive entries.
+zForwardingTable.inline.hpp:  // Visit only the first entry.
+zFuture.inline.hpp:  // Set value
+zFuture.inline.hpp:  // Notify waiter
+zFuture.inline.hpp:  // Wait for notification
+zFuture.inline.hpp:  // Return value
+zGeneration.cpp:  // Freeing empty pages in bulk is an optimization to avoid grabbing
+zGeneration.cpp:  // the page allocator lock, and trying to satisfy stalled allocations
+zGeneration.cpp:  // too frequently.
+zGeneration.cpp:  // Register relocatable pages with selector
+zGeneration.cpp:        // Not relocatable, don't register
+zGeneration.cpp:        // Note that the seqnum can change under our feet here as the page
+zGeneration.cpp:        // can be concurrently freed and recycled by a concurrent generation
+zGeneration.cpp:        // collection. However this property is stable across such transitions.
+zGeneration.cpp:        // If it was not relocatable before recycling, then it won't be
+zGeneration.cpp:        // relocatable after it gets recycled either, as the seqnum atomically
+zGeneration.cpp:        // becomes allocating for the given generation. The opposite property
+zGeneration.cpp:        // also holds: if the page is relocatable, then it can't have been
+zGeneration.cpp:        // concurrently freed; if it was re-allocated it would not be
+zGeneration.cpp:        // relocatable, and if it was not re-allocated we know that it was
+zGeneration.cpp:        // allocated earlier than mark start of the current generation
+zGeneration.cpp:        // collection.
+zGeneration.cpp:        // Register live page
+zGeneration.cpp:        // Register empty page
+zGeneration.cpp:        // Reclaim empty pages in bulk
+zGeneration.cpp:        // An active iterator blocks immediate recycle and delete of pages.
+zGeneration.cpp:        // The intent it to allow the code that iterates over the pages to
+zGeneration.cpp:        // safely read the properties of the pages without them being changed
+zGeneration.cpp:        // by another thread. However, this function both iterates over the
+zGeneration.cpp:        // pages AND frees/recycles them. We "yield" the iterator, so that we
+zGeneration.cpp:        // can perform immediate recycling (as long as no other thread is
+zGeneration.cpp:        // iterating over the pages). The contract is that the pages that are
+zGeneration.cpp:        // about to be freed are "owned" by this thread, and no other thread
+zGeneration.cpp:        // will change their states.
+zGeneration.cpp:    // Reclaim remaining empty pages
+zGeneration.cpp:  // Select relocation set
+zGeneration.cpp:  // Selecting tenuring threshold must be done after select
+zGeneration.cpp:  // which produces the liveness data, but before install,
+zGeneration.cpp:  // which consumes the tenuring threshold.
+zGeneration.cpp:  // Install relocation set
+zGeneration.cpp:  // Flip age young pages that were not selected
+zGeneration.cpp:  // Setup forwarding table
+zGeneration.cpp:  // Update statistics
+zGeneration.cpp:  // Reset forwarding table
+zGeneration.cpp:  // Reset relocation set
+zGeneration.cpp:  // The heap at collection end data is gathered at relocate end
+zGeneration.cpp:    // Blocking JNI critical regions is needed in operations where we change
+zGeneration.cpp:    // the bad mask or move objects. Changing the bad mask will invalidate all
+zGeneration.cpp:    // oops, which makes it conceptually the same thing as moving all objects.
+zGeneration.cpp:    // Setup GC id and active marker
+zGeneration.cpp:    // Verify before operation
+zGeneration.cpp:    // Execute operation
+zGeneration.cpp:    // Update statistics
+zGeneration.cpp:    // Update statistics and set the GC timer
+zGeneration.cpp:    // Update statistics and clear the GC timer
+zGeneration.cpp:  // Phase 1: Pause Mark Start
+zGeneration.cpp:  // Phase 2: Concurrent Mark
+zGeneration.cpp:  // Phase 3: Pause Mark End
+zGeneration.cpp:    // Phase 3.5: Concurrent Mark Continue
+zGeneration.cpp:  // Phase 4: Concurrent Mark Free
+zGeneration.cpp:  // Phase 5: Concurrent Reset Relocation Set
+zGeneration.cpp:  // Phase 6: Concurrent Select Relocation Set
+zGeneration.cpp:  // Phase 7: Pause Relocate Start
+zGeneration.cpp:  // Note that we can't have an abortpoint here. We need
+zGeneration.cpp:  // to let concurrent_relocate() call abort_page()
+zGeneration.cpp:  // on the remaining entries in the relocation set.
+zGeneration.cpp:  // Phase 8: Concurrent Relocate
+zGeneration.cpp:      // Increment tenuring threshold until promoted memory goes below the
+zGeneration.cpp:      // heuristically computed threshold
+zGeneration.cpp:  // Flip address view
+zGeneration.cpp:  // Retire allocating pages
+zGeneration.cpp:  // Reset allocated/reclaimed/used statistics
+zGeneration.cpp:  // Increment sequence number
+zGeneration.cpp:  // Enter mark phase
+zGeneration.cpp:  // Reset marking information and mark roots
+zGeneration.cpp:  // Flip remembered set bits
+zGeneration.cpp:  // Update statistics
+zGeneration.cpp:  // End marking
+zGeneration.cpp:    // Marking not completed, continue concurrent mark
+zGeneration.cpp:  // Enter mark completed phase
+zGeneration.cpp:  // Update statistics
+zGeneration.cpp:  // Notify JVMTI that some tagmap entry objects may have died.
+zGeneration.cpp:  // Flip address view
+zGeneration.cpp:  // Enter relocate phase
+zGeneration.cpp:  // Update statistics
+zGeneration.cpp:  // Notify JVMTI
+zGeneration.cpp:  // Relocate relocation set
+zGeneration.cpp:  // Update statistics
+zGeneration.cpp:  // Update statistics
+zGeneration.cpp:  // Update statistics
+zGeneration.cpp:    // Update statistics and set the GC timer
+zGeneration.cpp:    // Update statistics and clear the GC timer
+zGeneration.cpp:  // Phase 1: Concurrent Mark
+zGeneration.cpp:  // Phase 2: Pause Mark End
+zGeneration.cpp:    // Phase 2.5: Concurrent Mark Continue
+zGeneration.cpp:  // Phase 3: Concurrent Mark Free
+zGeneration.cpp:  // Phase 4: Concurrent Process Non-Strong References
+zGeneration.cpp:  // Phase 5: Concurrent Reset Relocation Set
+zGeneration.cpp:  // Phase 6: Pause Verify
+zGeneration.cpp:  // Phase 7: Concurrent Select Relocation Set
+zGeneration.cpp:    // Phase 8: Concurrent Remap Roots
+zGeneration.cpp:    // Phase 9: Pause Relocate Start
+zGeneration.cpp:  // Note that we can't have an abortpoint here. We need
+zGeneration.cpp:  // to let concurrent_relocate() call abort_page()
+zGeneration.cpp:  // on the remaining entries in the relocation set.
+zGeneration.cpp:  // Phase 10: Concurrent Relocate
+zGeneration.cpp:  // Note that we block out concurrent young collections when performing the
+zGeneration.cpp:  // verification. The verification checks that store good oops in the
+zGeneration.cpp:  // old generation have a corresponding remembered set entry, or is in
+zGeneration.cpp:  // a store barrier buffer (hence asynchronously creating such entries).
+zGeneration.cpp:  // That lookup would otherwise race with installation of base pointers
+zGeneration.cpp:  // into the store barrier buffer. We dodge that race by blocking out
+zGeneration.cpp:  // young collections during this verification.
+zGeneration.cpp:    // Limited verification
+zGeneration.cpp:  // Verification
+zGeneration.cpp:  // Flip address view
+zGeneration.cpp:  // Retire allocating pages
+zGeneration.cpp:  // Reset allocated/reclaimed/used statistics
+zGeneration.cpp:  // Reset encountered/dropped/enqueued statistics
+zGeneration.cpp:  // Increment sequence number
+zGeneration.cpp:  // Enter mark phase
+zGeneration.cpp:  // Reset marking information and mark roots
+zGeneration.cpp:  // Update statistics
+zGeneration.cpp:  // Try end marking
+zGeneration.cpp:    // Marking not completed, continue concurrent mark
+zGeneration.cpp:  // Enter mark completed phase
+zGeneration.cpp:  // Verify after mark
+zGeneration.cpp:  // Update statistics
+zGeneration.cpp:  // Block resurrection of weak/phantom references
+zGeneration.cpp:  // Prepare to unload stale metadata and nmethods
+zGeneration.cpp:  // Notify JVMTI that some tagmap entry objects may have died.
+zGeneration.cpp:    // Does nothing
+zGeneration.cpp:    // We only care about synchronizing the GC threads.
+zGeneration.cpp:    // Leave the Java threads running.
+zGeneration.cpp:    // Light weight "handshake" of the GC threads
+zGeneration.cpp:  // Process Soft/Weak/Final/PhantomReferences
+zGeneration.cpp:  // Process weak roots
+zGeneration.cpp:  // Unlink stale metadata and nmethods
+zGeneration.cpp:  // Perform a handshake. This is needed 1) to make sure that stale
+zGeneration.cpp:  // metadata and nmethods are no longer observable. And 2), to
+zGeneration.cpp:  // prevent the race where a mutator first loads an oop, which is
+zGeneration.cpp:  // logically null but not yet cleared. Then this oop gets cleared
+zGeneration.cpp:  // by the reference processor and resurrection is unblocked. At
+zGeneration.cpp:  // this point the mutator could see the unblocked state and pass
+zGeneration.cpp:  // this invalid oop through the normal barrier path, which would
+zGeneration.cpp:  // incorrectly try to mark the oop.
+zGeneration.cpp:  // GC threads are not part of the handshake above.
+zGeneration.cpp:  // Explicitly "handshake" them.
+zGeneration.cpp:  // Unblock resurrection of weak/phantom references
+zGeneration.cpp:  // Purge stale metadata and nmethods that were unlinked
+zGeneration.cpp:  // Enqueue Soft/Weak/Final/PhantomReferences. Note that this
+zGeneration.cpp:  // must be done after unblocking resurrection. Otherwise the
+zGeneration.cpp:  // Finalizer thread could call Reference.get() on the Finalizers
+zGeneration.cpp:  // that were just enqueued, which would incorrectly return null
+zGeneration.cpp:  // during the resurrection block window, since such referents
+zGeneration.cpp:  // are only Finalizable marked.
+zGeneration.cpp:  // Clear old markings claim bits.
+zGeneration.cpp:  // Note: Clearing _claim_strong also clears _claim_finalizable.
+zGeneration.cpp:  // Finish unloading stale metadata and nmethods
+zGeneration.cpp:  // Flip address view
+zGeneration.cpp:  // Enter relocate phase
+zGeneration.cpp:  // Update statistics
+zGeneration.cpp:  // Notify JVMTI
+zGeneration.cpp:  // Relocate relocation set
+zGeneration.cpp:  // Update statistics
+zGeneration.cpp:      // Heal barriers
+zGeneration.cpp:      // Heal oops
+zGeneration.cpp:      // Disarm
+zGeneration.cpp:    // Visit all object fields that potentially pointing into young generation
+zGeneration.cpp:  // Remap remembered sets
+zGeneration.hpp:  // GC phases
+zGeneration.hpp:  // Statistics
+zGeneration.hpp:  // Workers
+zGeneration.hpp:  // Worker resizing
+zGeneration.hpp:  // Marking
+zGeneration.hpp:  // Relocation
+zGeneration.hpp:  // Threads
+zGeneration.hpp:  // Support for promoting object to the old generation
+zGeneration.hpp:  // Add remembered set entries
+zGeneration.hpp:  // Scan a remembered set entry
+zGeneration.hpp:  // Scan all remembered sets
+zGeneration.hpp:  // Verification
+zGeneration.hpp:  // Reference processing
+zGeneration.inline.hpp:    // Not forwarding
+zGeneration.inline.hpp:  // Relocate object
+zGeneration.inline.hpp:    // Not forwarding
+zGeneration.inline.hpp:  // Remap object
+zHeap.cpp:  // Install global heap instance
+zHeap.cpp:  // Prime cache
+zHeap.cpp:  // Update statistics
+zHeap.cpp:  // Successfully initialized
+zHeap.cpp:    // The remaining space in the allocator is not enough to
+zHeap.cpp:    // fit the smallest possible TLAB. This means that the next
+zHeap.cpp:    // TLAB allocation will force the allocator to get a new
+zHeap.cpp:    // backing page anyway, which in turn means that we can then
+zHeap.cpp:    // fit the largest possible TLAB.
+zHeap.cpp:    // Null isn't in the heap.
+zHeap.cpp:  // An address is considered to be "in the heap" if it points into
+zHeap.cpp:  // the allocated part of a page, regardless of which heap view is
+zHeap.cpp:  // used. Note that an address with the finalizable metadata bit set
+zHeap.cpp:  // is not pointing into a heap view, and therefore not considered
+zHeap.cpp:  // to be "in the heap".
+zHeap.cpp:  // Could still be a from-object during an in-place relocation
+zHeap.cpp:    // Insert page table entry
+zHeap.cpp:  // Remove page table entry
+zHeap.cpp:  // Free page
+zHeap.cpp:  // Remove page table entries
+zHeap.cpp:  // Free pages
+zHeap.cpp:  // Do not allow pages to be deleted
+zHeap.cpp:  // Print all pages
+zHeap.cpp:  // Allow pages to be deleted
+zHeap.cpp:    // Intentionally unchecked cast
+zHeap.hpp:  // Heap metrics
+zHeap.hpp:  // Liveness
+zHeap.hpp:  // Page allocation
+zHeap.hpp:  // Object allocation
+zHeap.hpp:  // Iteration
+zHeap.hpp:  // Serviceability
+zHeap.hpp:  // Printing
+zHeap.hpp:  // Verification
+zHeapIterator.cpp:  // Create queues
+zHeapIterator.cpp:  // Create array queues
+zHeapIterator.cpp:  // Destroy bitmaps
+zHeapIterator.cpp:  // Destroy array queues
+zHeapIterator.cpp:  // Destroy queues
+zHeapIterator.cpp:  // Clear claimed CLD bits
+zHeapIterator.cpp:      // Install new bitmap
+zHeapIterator.cpp:    // If ClassUnloading is turned off, all nmethods are considered strong,
+zHeapIterator.cpp:    // not only those on the call stacks. The heap iteration might happen
+zHeapIterator.cpp:    // before the concurrent processign of the code cache, make sure that
+zHeapIterator.cpp:    // all nmethods have been processed before visiting the oops.
+zHeapIterator.cpp:  // Follow klass
+zHeapIterator.cpp:  // Push array chunk
+zHeapIterator.cpp:  // Push remaining array chunk first
+zHeapIterator.cpp:  // Follow array chunk
+zHeapIterator.cpp:  // Follow
+zHeuristics.cpp:  // Set ZPageSizeMedium so that a medium page occupies at most 3.125% of the
+zHeuristics.cpp:  // max heap size. ZPageSizeMedium is initially set to 0, which means medium
+zHeuristics.cpp:  // pages are effectively disabled. It is adjusted only if ZPageSizeMedium
+zHeuristics.cpp:  // becomes larger than ZPageSizeSmall.
+zHeuristics.cpp:    // Enable medium pages
+zHeuristics.cpp:  // Calculate headroom needed to avoid in-place relocation. Each worker will try
+zHeuristics.cpp:  // to allocate a small page, and all workers will share a single medium page.
+zHeuristics.cpp:  // Use per-CPU shared small pages only if these pages occupy at most 3.125%
+zHeuristics.cpp:  // of the max heap size. Otherwise fall back to using a single shared small
+zHeuristics.cpp:  // page. This is useful when using small heaps on large machines.
+zHeuristics.cpp:  // Cap number of workers so that they don't use more than 2% of the max heap
+zHeuristics.cpp:  // during relocation. This is useful when using small heaps on large machines.
+zHeuristics.cpp:  // Use 60% of the CPUs, rounded up. We would like to use as many threads as
+zHeuristics.cpp:  // possible to increase parallelism. However, using a thread count that is
+zHeuristics.cpp:  // close to the number of processors tends to lead to over-provisioning and
+zHeuristics.cpp:  // scheduling latency issues. Using 60% of the active processors appears to
+zHeuristics.cpp:  // be a fairly good balance.
+zHeuristics.cpp:  // The number of concurrent threads we would like to use heavily depends
+zHeuristics.cpp:  // on the type of workload we are running. Using too many threads will have
+zHeuristics.cpp:  // a negative impact on the application throughput, while using too few
+zHeuristics.cpp:  // threads will prolong the GC cycle and we then risk being out-run by the
+zHeuristics.cpp:  // application.
+zIndexDistributor.inline.hpp:  // For claiming a stripe
+zIndexDistributor.inline.hpp:  // For claiming inside a stripe
+zIndexDistributor.inline.hpp:    // Use claiming
+zIndexDistributor.inline.hpp:    // Use stealing
+zIndexDistributor.inline.hpp:  // The N - 1 levels are used to claim a segment in the
+zIndexDistributor.inline.hpp:  // next level the Nth level claims an index.
+zIndexDistributor.inline.hpp:  // Describes the how the number of indices increases when going up from the given level
+zIndexDistributor.inline.hpp:  // Number of indices in one segment at the last level
+zIndexDistributor.inline.hpp:  // For deallocation
+zIndexDistributor.inline.hpp:  // Contains the tree of claim variables
+zIndexDistributor.inline.hpp:  // Claim index functions
+zIndexDistributor.inline.hpp:  // Number of claim entries at the given level
+zIndexDistributor.inline.hpp:  // The index the next level starts at
+zIndexDistributor.inline.hpp:      // First level uses padding
+zIndexDistributor.inline.hpp:  // Total size used to hold all claim variables
+zIndexDistributor.inline.hpp:  // Returns the index of the start of the current segment of the current level
+zIndexDistributor.inline.hpp:    // The claim index for the current level is found in the previous levels
+zIndexDistributor.inline.hpp:  // Claim functions
+zIndexDistributor.inline.hpp:      // Visit ClaimLevels and the last level
+zIndexDistributor.inline.hpp:      // First try to claim at next level
+zIndexDistributor.inline.hpp:      // Then steal at next level
+zIndexDistributor.inline.hpp:  // Functions to claimed values to an index
+zIndexDistributor.inline.hpp:    //const int index = first_level * second_level_max * _third_level_max + second_level * _third_level_max + third_level;
+zInitialize.cpp:  // Early initialization
+zIterator.hpp:  // This iterator skips invisible roots
+zIterator.hpp:  // This function skips invisible roots
+zIterator.inline.hpp:  // Skip invisible object arrays - we only filter out *object* arrays,
+zIterator.inline.hpp:  // because that check is arguably faster than the is_invisible_object
+zIterator.inline.hpp:  // check, and primitive arrays are cheap to call oop_iterate on.
+zJNICritical.cpp:      // Already blocked, wait until unblocked
+zJNICritical.cpp:      // Unblocked
+zJNICritical.cpp:    // Increment and invert count
+zJNICritical.cpp:    // If the previous count was 0, then we just incremented and inverted
+zJNICritical.cpp:    // it to -1 and we have now blocked. Otherwise we wait until all Java
+zJNICritical.cpp:    // threads have exited the critical region.
+zJNICritical.cpp:      // Wait until blocked
+zJNICritical.cpp:    // Blocked
+zJNICritical.cpp:  // Notify unblocked
+zJNICritical.cpp:      // Wait until unblocked
+zJNICritical.cpp:      // Transition thread to blocked before locking to avoid deadlock
+zJNICritical.cpp:      // Unblocked
+zJNICritical.cpp:    // Increment count
+zJNICritical.cpp:    // Entered critical region
+zJNICritical.cpp:      // No block in progress, decrement count
+zJNICritical.cpp:      // Block in progress, increment count
+zJNICritical.cpp:      // If the previous count was -2, then we just incremented it to -1,
+zJNICritical.cpp:      // and we should signal that all Java threads have now exited the
+zJNICritical.cpp:      // critical region and we are now blocked.
+zJNICritical.cpp:        // Nofity blocked
+zJNICritical.cpp:    // Exited critical region
+zJNICritical.hpp:  // For use by GC
+zJNICritical.hpp:  // For use by Java threads
+zList.inline.hpp:  // No more elements
+zLiveMap.cpp:  // We need at least one bit per segment
+zLiveMap.cpp:  // Multiple threads can enter here, make sure only one of them
+zLiveMap.cpp:  // resets the marking information while the others busy wait.
+zLiveMap.cpp:      // Reset marking information
+zLiveMap.cpp:      // Clear segment claimed/live bits
+zLiveMap.cpp:      // Make sure the newly reset marking information is ordered
+zLiveMap.cpp:      // before the update of the page seqnum, such that when the
+zLiveMap.cpp:      // up-to-date seqnum is load acquired, the bit maps will not
+zLiveMap.cpp:      // contain stale information.
+zLiveMap.cpp:    // Mark reset contention
+zLiveMap.cpp:      // Count contention once
+zLiveMap.cpp:    // Already claimed, wait for live bit to be set
+zLiveMap.cpp:      // Mark reset contention
+zLiveMap.cpp:        // Count contention once
+zLiveMap.cpp:    // Segment is live
+zLiveMap.cpp:  // Segment claimed, clear it
+zLiveMap.cpp:  // Set live bit
+zLiveMap.inline.hpp:    // First object to be marked during this
+zLiveMap.inline.hpp:    // cycle, reset marking information.
+zLiveMap.inline.hpp:    // First object to be marked in this segment during
+zLiveMap.inline.hpp:    // this cycle, reset segment bitmap.
+zLiveMap.inline.hpp:  // Get the size of the object before calling the closure, which
+zLiveMap.inline.hpp:  // might overwrite the object in case we are relocating in-place.
+zLiveMap.inline.hpp:  // Apply closure
+zLiveMap.inline.hpp:    // Don't visit the finalizable bits
+zLiveMap.inline.hpp:    // For each live segment
+zLiveMap.inline.hpp:  // Check first segment
+zLiveMap.inline.hpp:  // Search earlier segments
+zLiveMap.inline.hpp:  // Align down marked vs strongly marked
+zMarkCache.cpp:  // Evict all entries
+zMarkCache.inline.hpp:    // Cache hit
+zMarkCache.inline.hpp:    // Cache miss
+zMarkCache.inline.hpp:    // Write cached data out to page
+zMark.cpp:  // Calculate the number of stripes from the number of workers we use,
+zMark.cpp:  // where the number of stripes must be a power of two and we want to
+zMark.cpp:  // have at least one worker per stripe.
+zMark.cpp:  // Verification
+zMark.cpp:  // Reset flush/continue counters
+zMark.cpp:  // Set number of workers to use
+zMark.cpp:  // Set number of mark stripes to use, based on number
+zMark.cpp:  // of workers we will use in the concurrent mark phase.
+zMark.cpp:  // Update statistics
+zMark.cpp:  // Print worker/stripe distribution
+zMark.cpp:  // Set number of workers to use
+zMark.cpp:  // Set number of mark stripes to use, based on number
+zMark.cpp:  // of workers we will use in the concurrent mark phase.
+zMark.cpp:  // Set number of active workers
+zMark.cpp:  // Reset flush counters
+zMark.cpp:  // Accumulate proactive/terminate flush counters
+zMark.cpp:  // Calculate the aligned middle start/end/size, where the middle start
+zMark.cpp:  // should always be greater than the start (hence the +1 below) to make
+zMark.cpp:  // sure we always do some follow work, not just split the array into pieces.
+zMark.cpp:  // Push unaligned trailing part
+zMark.cpp:  // Push aligned middle part(s)
+zMark.cpp:  // Follow leading part
+zMark.cpp:    // Only visit metadata if we're marking through the old generation
+zMark.cpp:    // Only help out with metadata visiting
+zMark.cpp:  // Should be convertible to colorless oop
+zMark.cpp:    // Young gen must help out with old marking
+zMark.cpp:    // Not enabled
+zMark.cpp:    // Not a String object
+zMark.cpp:    // Already requested deduplication
+zMark.cpp:  // Request deduplication
+zMark.cpp:  // Decode flags
+zMark.cpp:  // Decode object address and additional flags
+zMark.cpp:  // Mark
+zMark.cpp:    // Already marked
+zMark.cpp:  // Increment live
+zMark.cpp:    // Update live objects/bytes for page. We use the aligned object
+zMark.cpp:    // size since that is the actual number of bytes used on the page
+zMark.cpp:    // and alignment paddings can never be reclaimed.
+zMark.cpp:  // Follow
+zMark.cpp:      // Try deduplicate
+zMark.cpp:  // Drain stripe stacks
+zMark.cpp:      // Yield once per 32 oops
+zMark.cpp:  // Try to steal a local stack from another stripe
+zMark.cpp:      // Success, install the stolen stack
+zMark.cpp:  // Nothing to steal
+zMark.cpp:  // Try to steal a stack from another stripe
+zMark.cpp:      // Success, install the stolen stack
+zMark.cpp:  // Nothing to steal
+zMark.cpp:    // Flush GC threads
+zMark.cpp:    // Flush VM thread
+zMark.cpp:  // Returns true if more work is available
+zMark.cpp:  // Only do proactive flushes from worker 0
+zMark.cpp:    // Limit reached or we're trying to terminate
+zMark.cpp:      // Stole work
+zMark.cpp:      // Work available
+zMark.cpp:      // Terminate
+zMark.cpp:  // Free remaining stacks
+zMark.cpp:      // Heal barriers
+zMark.cpp:      // Heal oops
+zMark.cpp:      // Disarm
+zMark.cpp:      // NOTE: Not for young marking
+zMark.cpp:      // Heal barriers
+zMark.cpp:      // ZNMethod::nmethod_patch_barriers(nm);
+zMark.cpp:      // Heal oops
+zMark.cpp:      // Disarm only the young marking, not any potential old marking cycle
+zMark.cpp:      // Check if disarming for young mark, completely disarms the nmethod entry barrier
+zMark.cpp:        // We are about to completely disarm the nmethod, must take responsibility to patch all barriers before disarming
+zMark.cpp:    // Flush and free worker stacks. Needed here since
+zMark.cpp:    // the set of workers executing during root scanning
+zMark.cpp:    // can be different from the set of workers executing
+zMark.cpp:    // during mark.
+zMark.cpp:    // Flush and free worker stacks. Needed here since
+zMark.cpp:    // the set of workers executing during root scanning
+zMark.cpp:    // can be different from the set of workers executing
+zMark.cpp:    // during mark.
+zMark.cpp:    // Mark from old-to-young pointers
+zMark.cpp:    // An oop was resurrected after concurrent termination.
+zMark.cpp:  // Try end marking
+zMark.cpp:  // Check if non-java threads have any pending marking
+zMark.cpp:  // Mark completed
+zMark.cpp:  // Try end marking
+zMark.cpp:    // Mark not completed
+zMark.cpp:  // Verification
+zMark.cpp:  // Update statistics
+zMark.cpp:  // Mark completed
+zMark.cpp:  // Free any unused mark stack space
+zMark.cpp:  // Update statistics
+zMark.cpp:  // Verify thread stacks
+zMark.cpp:  // Verify stripe stacks
+zMark.inline.hpp:    // Already implicitly marked
+zMark.inline.hpp:    // Try mark object
+zMark.inline.hpp:      // Already marked
+zMark.inline.hpp:    // Don't push if already marked
+zMark.inline.hpp:      // Already marked
+zMark.inline.hpp:  // Push
+zMarkStackAllocator.cpp:  // Reserve address space
+zMarkStackAllocator.cpp:  // Successfully initialized
+zMarkStackAllocator.cpp:  // Prime space
+zMarkStackAllocator.cpp:    // Expansion limit reached. This is a fatal error since we
+zMarkStackAllocator.cpp:    // currently can't recover from running out of mark stack space.
+zMarkStackAllocator.cpp:  // Expand
+zMarkStackAllocator.cpp:  // Shrink to what is currently used
+zMarkStackAllocator.cpp:    // Shrink
+zMarkStackAllocator.cpp:      // Not enough space left
+zMarkStackAllocator.cpp:      // Success
+zMarkStackAllocator.cpp:    // Retry
+zMarkStackAllocator.cpp:  // Retry allocation before expanding
+zMarkStackAllocator.cpp:  // Expand
+zMarkStackAllocator.cpp:  // Increment top before end to make sure another
+zMarkStackAllocator.cpp:  // thread can't steal out newly expanded space.
+zMarkStackAllocator.cpp:  // Use first stack as magazine
+zMarkStackAllocator.cpp:  // Try allocating from the free list first
+zMarkStackAllocator.cpp:  // Allocate new magazine
+zMarkStack.cpp:  // Re-construct array elements with the correct base
+zMarkStack.cpp:  // Mutators may read these values concurrently. It doesn't matter
+zMarkStack.cpp:  // if they see the old or new values.
+zMarkStack.cpp:    // Not a spillover worker, use natural stripe
+zMarkStack.cpp:    // Distribute spillover workers evenly across stripes
+zMarkStack.cpp:    // Allocate new magazine
+zMarkStack.cpp:    // Magazine is empty, convert magazine into a new stack
+zMarkStack.cpp:      // Convert stack into a new magazine
+zMarkStack.cpp:      // Success
+zMarkStack.cpp:    // Free and uninstall full magazine
+zMarkStack.cpp:      // Allocate and install new stack
+zMarkStack.cpp:        // Out of mark stack memory
+zMarkStack.cpp:      // Success
+zMarkStack.cpp:    // Publish/Overflow and uninstall stack
+zMarkStack.cpp:      // Try steal and install stack
+zMarkStack.cpp:        // Nothing to steal
+zMarkStack.cpp:      // Success
+zMarkStack.cpp:    // Free and uninstall stack
+zMarkStack.cpp:  // Flush all stacks
+zMarkStack.cpp:    // Free/Publish and uninstall stack
+zMarkStack.cpp:  // Free and uninstall magazine
+zMarkStackEntry.hpp:    // This constructor is intentionally left empty and does not initialize
+zMarkStackEntry.hpp:    // _entry to allow it to be optimized out when instantiating ZMarkStack,
+zMarkStackEntry.hpp:    // which has a long array of ZMarkStackEntry elements, but doesn't care
+zMarkStackEntry.hpp:    // what _entry is initialized to.
+zMarkStack.inline.hpp:      // Success
+zMarkStack.inline.hpp:    // Retry
+zMarkStack.inline.hpp:      // Success
+zMarkStack.inline.hpp:    // Retry
+zMarkStack.inline.hpp:  // A stack is published either on the published list or the overflowed
+zMarkStack.inline.hpp:  // list. The published list is used by mutators publishing stacks for GC
+zMarkStack.inline.hpp:  // workers to work on, while the overflowed list is used by GC workers
+zMarkStack.inline.hpp:  // to publish stacks that overflowed. The intention here is to avoid
+zMarkStack.inline.hpp:  // contention between mutators and GC workers as much as possible, while
+zMarkStack.inline.hpp:  // still allowing GC workers to help out and steal work from each other.
+zMarkStack.inline.hpp:  // Steal overflowed stacks first, then published stacks
+zMarkTerminate.inline.hpp:    // Last thread leaving; notify waiters
+zMarkTerminate.inline.hpp:    // Last thread entering termination: success
+zMarkTerminate.inline.hpp:    // We got notified all work is done; terminate
+zMarkTerminate.inline.hpp:  // We either got notification about more work
+zMarkTerminate.inline.hpp:  // or got a spurious wakeup; don't terminate
+zMarkTerminate.inline.hpp:    // Everyone is working
+zMarkTerminate.inline.hpp:  // Update resurrected if it changed
+zMemory.cpp:  // Out of memory
+zMemory.cpp:        // Exact match, remove area
+zMemory.cpp:        // Larger than requested, shrink area
+zMemory.cpp:  // Out of memory
+zMemory.cpp:      // Smaller than or equal to requested, remove area
+zMemory.cpp:      // Larger than requested, shrink area
+zMemory.cpp:  // Out of memory
+zMemory.cpp:        // Exact match, remove area
+zMemory.cpp:        // Larger than requested, shrink area
+zMemory.cpp:  // Out of memory
+zMemory.cpp:          // Merge with prev and current area
+zMemory.cpp:          // Merge with prev area
+zMemory.cpp:        // Merge with current area
+zMemory.cpp:        // Insert new area before current area
+zMemory.cpp:      // Done
+zMemory.cpp:  // Insert last
+zMemory.cpp:    // Merge with last area
+zMemory.cpp:    // Insert new area last
+zMetronome.cpp:    // First tick, set start time
+zMetronome.cpp:    // We might wake up spuriously from wait, so always recalculate
+zMetronome.cpp:    // the timeout after a wakeup to see if we need to wait again.
+zMetronome.cpp:      // Wait
+zMetronome.cpp:      // Tick
+zMetronome.cpp:          // Missed one or more ticks. Bump _nticks accordingly to
+zMetronome.cpp:          // avoid firing a string of immediate ticks to make up
+zMetronome.cpp:          // for the ones we missed.
+zMetronome.cpp:  // Stopped
+zNMethod.cpp:  // Find all barrier and oop relocations
+zNMethod.cpp:      // Barrier relocation
+zNMethod.cpp:      // Oop relocation
+zNMethod.cpp:        // Non-immediate oop found
+zNMethod.cpp:        // Non-NULL immediate oop found. NULL oops can safely be
+zNMethod.cpp:        // ignored since the method will be re-registered if they
+zNMethod.cpp:        // are later patched to be non-NULL.
+zNMethod.cpp:  // Attach GC data to nmethod
+zNMethod.cpp:  // Attach barriers and oops to GC data
+zNMethod.cpp:    // Print nmethod barriers
+zNMethod.cpp:    // Print nmethod oops table
+zNMethod.cpp:    // Print nmethod immediate oops
+zNMethod.cpp:  // Create and attach gc data
+zNMethod.cpp:  // Patch nmathod barriers
+zNMethod.cpp:  // Register nmethod
+zNMethod.cpp:  // Disarm nmethod entry barrier
+zNMethod.cpp:    // The sweeper must wait for any ongoing iteration to complete
+zNMethod.cpp:    // before it can unregister an nmethod.
+zNMethod.cpp:  // Destroy GC data
+zNMethod.cpp:  // Process oops table
+zNMethod.cpp:  // Process immediate oops
+zNMethod.cpp:  // Process non-immediate oops
+zNMethod.cpp:  // color is stored at low order bits of int; implicit conversion to uintptr_t is fine
+zNMethod.cpp:    // If the nmethod entry barrier isn't armed, then it has been applied
+zNMethod.cpp:    // already. The implication is that the contents of the memory location
+zNMethod.cpp:    // is already a valid oop, and the barrier would have kept it alive if
+zNMethod.cpp:    // necessary. Therefore, no action is required, and we are allowed to
+zNMethod.cpp:    // simply read the oop.
+zNMethod.cpp:  // Make a local root
+zNMethod.cpp:    // Unlinking of the dependencies must happen before the
+zNMethod.cpp:    // handshake separating unlink and purge.
+zNMethod.cpp:    // unlink_from_method will take the CompiledMethod_lock.
+zNMethod.cpp:    // In this case we don't strictly need it when unlinking nmethods from
+zNMethod.cpp:    // the Method, because it is only concurrently unlinked by
+zNMethod.cpp:    // the entry barrier, which acquires the per nmethod lock.
+zNMethod.cpp:      // Invalidate the osr nmethod before the handshake. The nmethod
+zNMethod.cpp:      // will be made unloaded after the handshake. Then invalidate_osr_method()
+zNMethod.cpp:      // will be called again, which will be a no-op.
+zNMethod.cpp:      // Heal barriers
+zNMethod.cpp:      // Disarm
+zNMethod.cpp:    // Clear compiled ICs and exception caches
+zNMethod.cpp:    // Cleaning failed because we ran out of transitional IC stubs,
+zNMethod.cpp:    // so we have to refill and try again. Refilling requires taking
+zNMethod.cpp:    // a safepoint, so we temporarily leave the suspendible thread set.
+zNMethodTable.cpp:      // Insert new entry
+zNMethodTable.cpp:      // Replace existing entry
+zNMethodTable.cpp:      // Remove entry
+zNMethodTable.cpp:  // Allocate new table
+zNMethodTable.cpp:  // Transfer all registered entries
+zNMethodTable.cpp:  // Free old table
+zNMethodTable.cpp:  // Install new table
+zNMethodTable.cpp:  // The hash table uses linear probing. To avoid wasting memory while
+zNMethodTable.cpp:  // at the same time maintaining good hash collision behavior we want
+zNMethodTable.cpp:  // to keep the table occupancy between 30% and 70%. The table always
+zNMethodTable.cpp:  // grows/shrinks by doubling/halving its size. Pruning of unregistered
+zNMethodTable.cpp:  // entries is done by rebuilding the table with or without resizing it.
+zNMethodTable.cpp:    // Initialize table
+zNMethodTable.cpp:    // Shrink table
+zNMethodTable.cpp:    // Prune or grow table
+zNMethodTable.cpp:      // Prune table
+zNMethodTable.cpp:      // Grow table
+zNMethodTable.cpp:  // Grow/Shrink/Prune table if needed
+zNMethodTable.cpp:  // Insert new entry
+zNMethodTable.cpp:    // New entry registered. When register_entry() instead returns
+zNMethodTable.cpp:    // false the nmethod was already in the table so we do not want
+zNMethodTable.cpp:    // to increase number of registered entries in that case.
+zNMethodTable.cpp:  // Remove entry
+zNMethodTable.cpp:  // Do not allow the table to be deleted while iterating
+zNMethodTable.cpp:  // Prepare iteration
+zNMethodTable.cpp:  // Finish iteration
+zNMethodTable.cpp:  // Allow the table to be deleted
+zNMethodTable.cpp:  // Notify iteration done
+zNMethodTableIteration.cpp:  // Finish iteration
+zNMethodTableIteration.cpp:    // Claim table partition. Each partition is currently sized to span
+zNMethodTableIteration.cpp:    // two cache lines. This number is just a guess, but seems to work well.
+zNMethodTableIteration.cpp:      // End of table
+zNMethodTableIteration.cpp:    // Process table partition
+zObjArrayAllocator.cpp:  // ZGC specializes the initialization by performing segmented clearing
+zObjArrayAllocator.cpp:  // to allow shorter time-to-safepoints.
+zObjArrayAllocator.cpp:    // No need for ZGC specialization
+zObjArrayAllocator.cpp:  // A max segment size of 64K was chosen because microbenchmarking
+zObjArrayAllocator.cpp:  // suggested that it offered a good trade-off between allocation
+zObjArrayAllocator.cpp:  // time and time-to-safepoint
+zObjArrayAllocator.cpp:    // To small to use segmented clearing
+zObjArrayAllocator.cpp:  // Segmented clearing
+zObjArrayAllocator.cpp:  // The array is going to be exposed before it has been completely
+zObjArrayAllocator.cpp:  // cleared, therefore we can't expose the header at the end of this
+zObjArrayAllocator.cpp:  // function. Instead explicitly initialize it according to our needs.
+zObjArrayAllocator.cpp:  // Signal to the ZIterator that this is an invisible root, by setting
+zObjArrayAllocator.cpp:  // the mark word to "marked". Reset to prototype() after the clearing.
+zObjArrayAllocator.cpp:  // Keep the array alive across safepoints through an invisible
+zObjArrayAllocator.cpp:  // root. Invisible roots are not visited by the heap iterator
+zObjArrayAllocator.cpp:  // and the marking logic will not attempt to follow its elements.
+zObjArrayAllocator.cpp:  // Relocation and remembered set code know how to dodge iterating
+zObjArrayAllocator.cpp:  // over such objects.
+zObjArrayAllocator.cpp:    // Clear segment
+zObjArrayAllocator.cpp:    // Usually, the young marking code has the responsibility to color
+zObjArrayAllocator.cpp:    // raw nulls, before they end up in the old generation. However, the
+zObjArrayAllocator.cpp:    // invisible roots are hidden from the marking code, and therefore
+zObjArrayAllocator.cpp:    // we must color the nulls already here in the initialization. The
+zObjArrayAllocator.cpp:    // color we choose must be store bad for any subsequent stores, regardless
+zObjArrayAllocator.cpp:    // of how many GC flips later it will arrive. That's why we OR in 11
+zObjArrayAllocator.cpp:    // (ZPointerRememberedMask) in the remembered bits, similar to how
+zObjArrayAllocator.cpp:    // forgotten old oops also have 11, for the very same reason.
+zObjArrayAllocator.cpp:    // Safepoint
+zObjArrayAllocator.cpp:  // Signal to the ZIterator that this is no longer an invisible root
+zObjectAllocator.cpp:    // Increment used bytes
+zObjectAllocator.cpp:  // Increment undone bytes
+zObjectAllocator.cpp:    // Allocate new page
+zObjectAllocator.cpp:      // Allocate object before installing the new page
+zObjectAllocator.cpp:      // Install new page
+zObjectAllocator.cpp:          // Previous page was retired, retry installing the new page
+zObjectAllocator.cpp:        // Another page already installed, try allocation there first
+zObjectAllocator.cpp:          // Allocation failed, retry installing the new page
+zObjectAllocator.cpp:        // Allocation succeeded in already installed page
+zObjectAllocator.cpp:        // Undo new page allocation
+zObjectAllocator.cpp:  // Allocate new large page
+zObjectAllocator.cpp:    // Allocate the object
+zObjectAllocator.cpp:    // Small
+zObjectAllocator.cpp:    // Medium
+zObjectAllocator.cpp:    // Large
+zObjectAllocator.cpp:  // Reset used and undone bytes
+zObjectAllocator.cpp:  // Reset allocation pages
+zObjectAllocator.hpp:  // Allocate an object in a shared page. Allocate and
+zObjectAllocator.hpp:  // atomically install a new page if necessary.
+zObjectAllocator.hpp:  // Mutator allocation
+zObjectAllocator.hpp:  // Relocation
+zPageAllocator.cpp:    // The page has no concurrent readers.
+zPageAllocator.cpp:    // Recycle original page.
+zPageAllocator.cpp:  // The page could have concurrent readers.
+zPageAllocator.cpp:  // It would be unsafe to recycle this page at this point.
+zPageAllocator.cpp:  // As soon as the page is added to _unsafe_to_recycle, it
+zPageAllocator.cpp:  // must not be used again. Hence, the extra double-checked
+zPageAllocator.cpp:  // locking to only clone the page if it is believed to be
+zPageAllocator.cpp:  // unsafe to recycle the page.
+zPageAllocator.cpp:    // It became safe to recycle the page after the is_activated check
+zPageAllocator.cpp:  // The original page has been registered to be deleted by another thread.
+zPageAllocator.cpp:  // Recycle the cloned page.
+zPageAllocator.cpp:  // Warn if system limits could stop us from reaching max capacity
+zPageAllocator.cpp:  // Check if uncommit should and can be enabled
+zPageAllocator.cpp:  // Successfully initialized
+zPageAllocator.cpp:      // Get granule offset
+zPageAllocator.cpp:        // Done
+zPageAllocator.cpp:      // Pre-touch granule
+zPageAllocator.cpp:    // Pre-touch page
+zPageAllocator.cpp:  // Note that SoftMaxHeapSize is a manageable flag
+zPageAllocator.cpp:    // Update atomically since we have concurrent readers
+zPageAllocator.cpp:    // Record time of last commit. When allocation, we prefer increasing
+zPageAllocator.cpp:    // the capacity over flushing the cache. That means there could be
+zPageAllocator.cpp:    // expired pages in the cache at this time. However, since we are
+zPageAllocator.cpp:    // increasing the capacity we are obviously in need of committed
+zPageAllocator.cpp:    // memory and should therefore not be uncommitting memory.
+zPageAllocator.cpp:  // Update atomically since we have concurrent readers
+zPageAllocator.cpp:    // Adjust current max capacity to avoid further attempts to increase capacity
+zPageAllocator.cpp:    // Update atomically since we have concurrent readers
+zPageAllocator.cpp:  // We don't track generation usage here because this page
+zPageAllocator.cpp:  // could be allocated by a thread that satisfies a stalling
+zPageAllocator.cpp:  // allocation. The stalled thread can wake up and potentially
+zPageAllocator.cpp:  // realize that the page alloc should be undone. If the alloc
+zPageAllocator.cpp:  // and the undo gets separated by a safepoint, the generation
+zPageAllocator.cpp:  // statistics could se a decreasing used value between mark
+zPageAllocator.cpp:  // start and mark end.
+zPageAllocator.cpp:  // Update atomically since we have concurrent readers
+zPageAllocator.cpp:  // Update used high
+zPageAllocator.cpp:  // Update atomically since we have concurrent readers
+zPageAllocator.cpp:  // Update used low
+zPageAllocator.cpp:  // Update atomically since we have concurrent readers
+zPageAllocator.cpp:  // Update atomically since we have concurrent readers
+zPageAllocator.cpp:  // Commit physical memory
+zPageAllocator.cpp:  // Uncommit physical memory
+zPageAllocator.cpp:  // Map physical memory
+zPageAllocator.cpp:  // Unmap physical memory
+zPageAllocator.cpp:  // Destroy page safely
+zPageAllocator.cpp:  // Free virtual memory
+zPageAllocator.cpp:  // Free physical memory
+zPageAllocator.cpp:  // Destroy page safely
+zPageAllocator.cpp:    // Out of memory
+zPageAllocator.cpp:  // Try allocate from the page cache
+zPageAllocator.cpp:    // Success
+zPageAllocator.cpp:  // Try increase capacity
+zPageAllocator.cpp:    // Could not increase capacity enough to satisfy the allocation
+zPageAllocator.cpp:    // completely. Flush the page cache to satisfy the remainder.
+zPageAllocator.cpp:  // Success
+zPageAllocator.cpp:    // Out of memory
+zPageAllocator.cpp:  // Updated used statistics
+zPageAllocator.cpp:  // Success
+zPageAllocator.cpp:  // We can only block if the VM is fully initialized
+zPageAllocator.cpp:  // Start asynchronous minor GC
+zPageAllocator.cpp:  // Wait for allocation to complete or fail
+zPageAllocator.cpp:    // Guard deletion of underlying semaphore. This is a workaround for
+zPageAllocator.cpp:    // a bug in sem_post() in glibc < 2.21, where it's not safe to destroy
+zPageAllocator.cpp:    // the semaphore immediately after returning from sem_wait(). The
+zPageAllocator.cpp:    // reason is that sem_post() can touch the semaphore after a waiting
+zPageAllocator.cpp:    // thread have returned from sem_wait(). To avoid this race we are
+zPageAllocator.cpp:    // forcing the waiting thread to acquire/release the lock held by the
+zPageAllocator.cpp:    // posting thread. https://sourceware.org/bugzilla/show_bug.cgi?id=12674
+zPageAllocator.cpp:  // Send event
+zPageAllocator.cpp:      // Success
+zPageAllocator.cpp:    // Failed
+zPageAllocator.cpp:      // Don't stall
+zPageAllocator.cpp:    // Enqueue allocation request
+zPageAllocator.cpp:  // Stall
+zPageAllocator.cpp:  // Allocate virtual memory. To make error handling a lot more straight
+zPageAllocator.cpp:  // forward, we allocate virtual memory before destroying flushed pages.
+zPageAllocator.cpp:  // Flushed pages are also unmapped and destroyed asynchronously, so we
+zPageAllocator.cpp:  // can't immediately reuse that part of the address space anyway.
+zPageAllocator.cpp:  // Harvest physical memory from flushed pages
+zPageAllocator.cpp:    // Harvest flushed physical memory
+zPageAllocator.cpp:    // Unmap and destroy page
+zPageAllocator.cpp:    // Update statistics
+zPageAllocator.cpp:  // Allocate any remaining physical memory. Capacity and used has
+zPageAllocator.cpp:  // already been adjusted, we just need to fetch the memory, which
+zPageAllocator.cpp:  // is guaranteed to succeed.
+zPageAllocator.cpp:  // Create new page
+zPageAllocator.cpp:  // A small page can end up at a high address (second half of the address space)
+zPageAllocator.cpp:  // if we've split a larger page or we have a constrained address space. To help
+zPageAllocator.cpp:  // fight address space fragmentation we remap such pages to a lower address, if
+zPageAllocator.cpp:  // a lower address is available.
+zPageAllocator.cpp:  // The allocation is immediately satisfied if the list of pages contains
+zPageAllocator.cpp:  // exactly one page, with the type and size that was requested. However,
+zPageAllocator.cpp:  // even if the allocation is immediately satisfied we might still want to
+zPageAllocator.cpp:  // return false here to force the page to be remapped to fight address
+zPageAllocator.cpp:  // space fragmentation.
+zPageAllocator.cpp:    // Not a single page
+zPageAllocator.cpp:    // Wrong type or size
+zPageAllocator.cpp:    // Defragment address space
+zPageAllocator.cpp:  // Allocation immediately satisfied
+zPageAllocator.cpp:  // Fast path
+zPageAllocator.cpp:  // Slow path
+zPageAllocator.cpp:    // Out of address space
+zPageAllocator.cpp:  // Commit page
+zPageAllocator.cpp:    // Success
+zPageAllocator.cpp:  // Failed or partially failed. Split of any successfully committed
+zPageAllocator.cpp:  // part of the page into a new page and insert it into list of pages,
+zPageAllocator.cpp:  // so that it will be re-inserted into the page cache.
+zPageAllocator.cpp:  // Allocate one or more pages from the page cache. If the allocation
+zPageAllocator.cpp:  // succeeds but the returned pages don't cover the complete allocation,
+zPageAllocator.cpp:  // then finalize phase is allowed to allocate the remaining memory
+zPageAllocator.cpp:  // directly from the physical memory manager. Note that this call might
+zPageAllocator.cpp:  // block in a safepoint if the non-blocking flag is not set.
+zPageAllocator.cpp:    // Out of memory
+zPageAllocator.cpp:    // Failed to commit or map. Clean up and retry, in the hope that
+zPageAllocator.cpp:    // we can still allocate by flushing the page cache (more aggressively).
+zPageAllocator.cpp:  // The generation's used is tracked here when the page is handed out
+zPageAllocator.cpp:  // to the allocating thread. The overall heap "used" is tracked in
+zPageAllocator.cpp:  // the lower-level allocation code.
+zPageAllocator.cpp:  // Reset page. This updates the page's sequence number and must
+zPageAllocator.cpp:  // be done after we potentially blocked in a safepoint (stalled)
+zPageAllocator.cpp:  // where the global sequence number was updated.
+zPageAllocator.cpp:  // Update allocation statistics. Exclude gc relocations to avoid
+zPageAllocator.cpp:  // artificial inflation of the allocation rate during relocation.
+zPageAllocator.cpp:    // Note that there are two allocation rate counters, which have
+zPageAllocator.cpp:    // different purposes and are sampled at different frequencies.
+zPageAllocator.cpp:  // Send event
+zPageAllocator.cpp:      // Allocation queue is empty
+zPageAllocator.cpp:      // Allocation could not be satisfied, give up
+zPageAllocator.cpp:    // Allocation succeeded, dequeue and satisfy allocation request.
+zPageAllocator.cpp:    // Note that we must dequeue the allocation request first, since
+zPageAllocator.cpp:    // it will immediately be deallocated once it has been satisfied.
+zPageAllocator.cpp:  // Set time when last used
+zPageAllocator.cpp:  // Cache page
+zPageAllocator.cpp:  // Update used statistics
+zPageAllocator.cpp:  // Free page
+zPageAllocator.cpp:  // Try satisfy stalled allocations
+zPageAllocator.cpp:  // Update used statistics
+zPageAllocator.cpp:  // Free pages
+zPageAllocator.cpp:  // Try satisfy stalled allocations
+zPageAllocator.cpp:  // Only decrease the overall used and not the generation used,
+zPageAllocator.cpp:  // since the allocation failed and generation used wasn't bumped.
+zPageAllocator.cpp:  // Free any allocated/flushed pages
+zPageAllocator.cpp:  // Adjust capacity and used to reflect the failed capacity increase
+zPageAllocator.cpp:  // Try satisfy stalled allocations
+zPageAllocator.cpp:  // We need to join the suspendible thread set while manipulating capacity and
+zPageAllocator.cpp:  // used, to make sure GC safepoints will have a consistent view.
+zPageAllocator.cpp:    // Never uncommit below min capacity. We flush out and uncommit chunks at
+zPageAllocator.cpp:    // a time (~0.8% of the max capacity, but at least one granule and at most
+zPageAllocator.cpp:    // 256M), in case demand for memory increases while we are uncommitting.
+zPageAllocator.cpp:    // Flush pages to uncommit
+zPageAllocator.cpp:      // Nothing flushed
+zPageAllocator.cpp:    // Record flushed pages as claimed
+zPageAllocator.cpp:  // Unmap, uncommit, and destroy flushed pages
+zPageAllocator.cpp:    // Adjust claimed and capacity to reflect the uncommit
+zPageAllocator.cpp:    // No stalled allocations
+zPageAllocator.cpp:  // Fail allocation requests that were enqueued before the last major GC started
+zPageAllocator.cpp:      // Not out of memory, keep remaining allocation requests enqueued
+zPageAllocator.cpp:    // Out of memory, dequeue and fail allocation request
+zPageAllocator.cpp:    // No stalled allocations
+zPageAllocator.cpp:    // Start asynchronous minor GC, keep allocation requests enqueued
+zPageAllocator.cpp:    // Start asynchronous major GC, keep allocation requests enqueued
+zPageCache.cpp:  // Try NUMA local page cache
+zPageCache.cpp:  // Try NUMA remote page cache(s)
+zPageCache.cpp:  // Find a page with the right size
+zPageCache.cpp:      // Page found
+zPageCache.cpp:  // Find a page that is large enough
+zPageCache.cpp:      // Page found
+zPageCache.cpp:  // Try allocate exact page
+zPageCache.cpp:    // Try allocate potentially oversized page
+zPageCache.cpp:        // Split oversized page
+zPageCache.cpp:        // Cache remainder
+zPageCache.cpp:        // Re-type correctly sized page
+zPageCache.cpp:    // Don't flush page
+zPageCache.cpp:  // Flush page
+zPageCache.cpp:  // Flush lists round-robin
+zPageCache.cpp:      // Not done
+zPageCache.cpp:      // Done
+zPageCache.cpp:  // Prefer flushing large, then medium and last small pages
+zPageCache.cpp:    // Overflushed, re-insert part of last page into the cache
+zPageCache.cpp:      // Flush page
+zPageCache.cpp:    // Don't flush page
+zPageCache.cpp:    // Set initial timeout
+zPageCache.cpp:      // Don't flush page, record shortest non-expired timeout
+zPageCache.cpp:      // Don't flush page, requested amount flushed
+zPageCache.cpp:    // Flush page
+zPageCache.cpp:    // Delay uncommit, set next timeout
+zPageCache.cpp:    // Nothing to flush, set next timeout
+zPage.cpp:  // Only copy type and memory layouts. Let the rest be lazily reconstructed when needed.
+zPage.cpp:  // The page is still filled with the same objects, need to retain the top pointer.
+zPage.cpp:    // Remset not needed
+zPage.cpp:  // Young-to-old reset
+zPage.cpp:    // We don't clear the remset when pages are recycled and transition from
+zPage.cpp:    // old to young. Therefore we can end up in a situation where a young page
+zPage.cpp:    // already has an initialized remset.
+zPage.cpp:  // Old-to-old reset
+zPage.cpp:    // Page is on the way to be destroyed or reused, delay
+zPage.cpp:    // clearing until the page is reset for Allocation.
+zPage.cpp:    // Relocation failed and page is being compacted in-place. Current bits
+zPage.cpp:    // are needed to copy the remset incrementally. It will get cleared later on.
+zPage.cpp:    // Page stayed in the old gen. Needs new, fresh bits.
+zPage.cpp:  // Flip aged pages are still filled with the same objects, need to retain the top pointer.
+zPage.cpp:    // Promoted in-place relocations reset the live map,
+zPage.cpp:    // because they clone the page.
+zPage.cpp:  // Now we're done iterating over the livemaps
+zPage.cpp:  // Resize this page
+zPage.cpp:  // Create new page
+zPage.cpp:  // Split any committed part of this page into a separate page,
+zPage.cpp:  // leaving this page with only uncommitted physical memory.
+zPage.cpp:    // Nothing committed
+zPage.cpp:    // In-place relocation has changed the page to allocating
+zPage.hpp:  // Normal allocation path
+zPage.hpp:  // Relocation failed and started to relocate in-place
+zPage.hpp:  // Page was not selected for relocation, all objects
+zPage.hpp:  // stayed, but the page aged.
+zPage.hpp:  // The page was split and needs to be reset
+zPage.hpp:  // Only visits remembered set entries for live objects
+zPage.hpp:  // Verification
+zPage.inline.hpp:    // A large page can only contain a single
+zPage.inline.hpp:    // object aligned to the start of the page.
+zPage.inline.hpp:  // This function is only used by the marking code and therefore has stronger
+zPage.inline.hpp:  // asserts that are not always valid to ask when checking for liveness.
+zPage.inline.hpp:  // This function is only used by the marking code and therefore has stronger
+zPage.inline.hpp:  // asserts that are not always valid to ask when checking for liveness.
+zPage.inline.hpp:  // Set mark bit
+zPage.inline.hpp:    // Apply function
+zPage.inline.hpp:    // Not enough space left
+zPage.inline.hpp:      // Not enough space left
+zPage.inline.hpp:      // Success
+zPage.inline.hpp:    // Retry
+zPage.inline.hpp:    // Failed to undo allocation, not the last allocated object
+zPage.inline.hpp:  // Success
+zPage.inline.hpp:      // Failed to undo allocation, not the last allocated object
+zPage.inline.hpp:      // Success
+zPage.inline.hpp:    // Retry
+zPageTable.cpp:  // Make sure a newly created page is
+zPageTable.cpp:  // visible before updating the page table.
+zPageTable.inline.hpp:      // Next page found
+zPageTable.inline.hpp:  // No more pages
+zPageTable.inline.hpp:        // Next page found
+zPhysicalMemory.cpp:  // Free segments
+zPhysicalMemory.cpp:  // Copy segments
+zPhysicalMemory.cpp:  // Insert segments in address order, merge segments when possible
+zPhysicalMemory.cpp:          // Merge with end of current segment and start of next segment
+zPhysicalMemory.cpp:        // Merge with end of current segment
+zPhysicalMemory.cpp:        // Merge with start of next segment
+zPhysicalMemory.cpp:      // Insert after current segment
+zPhysicalMemory.cpp:    // Merge with start of first segment
+zPhysicalMemory.cpp:  // Insert before first segment
+zPhysicalMemory.cpp:    // Completely committed
+zPhysicalMemory.cpp:    // Partially committed, split segment
+zPhysicalMemory.cpp:    // Completely uncommitted
+zPhysicalMemory.cpp:    // Partially uncommitted, split segment
+zPhysicalMemory.cpp:        // Transfer segment
+zPhysicalMemory.cpp:        // Split segment
+zPhysicalMemory.cpp:      // Keep segment
+zPhysicalMemory.cpp:      // Transfer segment
+zPhysicalMemory.cpp:      // Keep segment
+zPhysicalMemory.cpp:  // Make the whole range free
+zPhysicalMemory.cpp:  // If uncommit is not explicitly disabled, max capacity is greater than
+zPhysicalMemory.cpp:  // min capacity, and uncommit is supported by the platform, then uncommit
+zPhysicalMemory.cpp:  // will be enabled.
+zPhysicalMemory.cpp:  // Test if uncommit is supported by the operating system by committing
+zPhysicalMemory.cpp:  // and then uncommitting a granule.
+zPhysicalMemory.cpp:  // Allocate segments
+zPhysicalMemory.cpp:  // Free segments
+zPhysicalMemory.cpp:  // Commit segments
+zPhysicalMemory.cpp:      // Segment already committed
+zPhysicalMemory.cpp:    // Commit segment
+zPhysicalMemory.cpp:      // Failed or partially failed
+zPhysicalMemory.cpp:  // Success
+zPhysicalMemory.cpp:  // Commit segments
+zPhysicalMemory.cpp:      // Segment already uncommitted
+zPhysicalMemory.cpp:    // Uncommit segment
+zPhysicalMemory.cpp:      // Failed or partially failed
+zPhysicalMemory.cpp:  // Success
+zPhysicalMemory.cpp:  // Map segments
+zPhysicalMemory.cpp:  // Setup NUMA interleaving for large pages
+zPhysicalMemory.cpp:    // To get granule-level NUMA interleaving when using large pages,
+zPhysicalMemory.cpp:    // we simply let the kernel interleave the memory for us at page
+zPhysicalMemory.cpp:    // fault time.
+zPhysicalMemory.cpp:  // Pre-touch all views
+zPhysicalMemory.cpp:  // Map all views
+zPhysicalMemory.cpp:  // Unmap all views
+zReferenceProcessor.cpp:    // A FinalReference is inactive if its next field is non-null. An application can't
+zReferenceProcessor.cpp:    // call enqueue() or clear() on a FinalReference.
+zReferenceProcessor.cpp:    // A non-FinalReference is inactive if the referent is null. The referent can only
+zReferenceProcessor.cpp:    // be null if the application called Reference.enqueue() or Reference.clear().
+zReferenceProcessor.cpp:    // Not a SoftReference
+zReferenceProcessor.cpp:  // Ask SoftReference policy
+zReferenceProcessor.cpp:  // PhantomReferences with finalizable marked referents should technically not have
+zReferenceProcessor.cpp:  // to be discovered. However, InstanceRefKlass::oop_oop_iterate_ref_processing()
+zReferenceProcessor.cpp:  // does not know about the finalizable mark concept, and will therefore mark
+zReferenceProcessor.cpp:  // referents in non-discovered PhantomReferences as strongly live. To prevent
+zReferenceProcessor.cpp:  // this, we always discover PhantomReferences with finalizable marked referents.
+zReferenceProcessor.cpp:  // They will automatically be dropped during the reference processing phase.
+zReferenceProcessor.cpp:    // Reference has already been cleared, by a call to Reference.enqueue()
+zReferenceProcessor.cpp:    // or Reference.clear() from the application, which means it's already
+zReferenceProcessor.cpp:    // inactive and we should drop the reference.
+zReferenceProcessor.cpp:  // Cleaning the referent will fail if the object it points to is
+zReferenceProcessor.cpp:  // still alive, in which case we should drop the reference.
+zReferenceProcessor.cpp:      // The referent in a FinalReference will not be cleared, instead it is
+zReferenceProcessor.cpp:      // made inactive by self-looping the next field. An application can't
+zReferenceProcessor.cpp:      // call FinalReference.enqueue(), so there is no race to worry about
+zReferenceProcessor.cpp:      // when setting the next field.
+zReferenceProcessor.cpp:  // Update statistics
+zReferenceProcessor.cpp:    // Mark referent (and its reachable subgraph) finalizable. This avoids
+zReferenceProcessor.cpp:    // the problem of later having to mark those objects if the referent is
+zReferenceProcessor.cpp:    // still final reachable during processing.
+zReferenceProcessor.cpp:  // Add reference to discovered list
+zReferenceProcessor.cpp:    // Reference processing disabled
+zReferenceProcessor.cpp:  // Update statistics
+zReferenceProcessor.cpp:    // Not discovered
+zReferenceProcessor.cpp:  // Discovered
+zReferenceProcessor.cpp:  // Unlink and return next in list
+zReferenceProcessor.cpp:  // Update statistics
+zReferenceProcessor.cpp:  // Return next in list
+zReferenceProcessor.cpp:  // The list is chained through the discovered field,
+zReferenceProcessor.cpp:  // but the first entry is not in the heap.
+zReferenceProcessor.cpp:      // End of list
+zReferenceProcessor.cpp:  // Prepend discovered references to internal pending list
+zReferenceProcessor.cpp:  // Anything keept on the list?
+zReferenceProcessor.cpp:    // Old list could be empty and contain a raw null, don't store raw nulls.
+zReferenceProcessor.cpp:    // Concatenate the old list
+zReferenceProcessor.cpp:      // Old list was empty. First to prepend to list, record tail
+zReferenceProcessor.cpp:      // Process discovered references
+zReferenceProcessor.cpp:  // Reset encountered
+zReferenceProcessor.cpp:  // Reset discovered
+zReferenceProcessor.cpp:  // Reset enqueued
+zReferenceProcessor.cpp:  // Sum encountered
+zReferenceProcessor.cpp:  // Sum discovered
+zReferenceProcessor.cpp:  // Sum enqueued
+zReferenceProcessor.cpp:  // Update statistics
+zReferenceProcessor.cpp:  // Trace statistics
+zReferenceProcessor.cpp:  // Process discovered lists
+zReferenceProcessor.cpp:  // Update SoftReference clock
+zReferenceProcessor.cpp:  // Collect, log and trace statistics
+zReferenceProcessor.cpp:    // Nothing to enqueue
+zReferenceProcessor.cpp:  // Verify references on internal pending list
+zReferenceProcessor.cpp:    // Heap_lock protects external pending list
+zReferenceProcessor.cpp:    // Prepend internal pending list to external pending list
+zReferenceProcessor.cpp:    // Notify ReferenceHandler thread
+zReferenceProcessor.cpp:  // Reset internal pending list
+zRelocate.cpp:    // All workers synchronized
+zRelocate.cpp:      // Queue became non-empty
+zRelocate.cpp:  // Fast path avoids locking
+zRelocate.cpp:  // Slow path to get the next forwarding and/or synchronize
+zRelocate.cpp:    // Synchronize
+zRelocate.cpp:      // All workers synchronized
+zRelocate.cpp:  // Wait for queue to become non-empty or desynchronized
+zRelocate.cpp:    // Desynchronize
+zRelocate.cpp:  // Check if queue is empty
+zRelocate.cpp:  // Get and remove first
+zRelocate.cpp:  // Allocate object
+zRelocate.cpp:    // Allocation failed
+zRelocate.cpp:  // Copy object
+zRelocate.cpp:  // Insert forwarding
+zRelocate.cpp:    // Already relocated, try undo allocation
+zRelocate.cpp:  // Lookup forwarding
+zRelocate.cpp:    // Already relocated
+zRelocate.cpp:  // Relocate object
+zRelocate.cpp:      // Success
+zRelocate.cpp:    // Failed to relocate object. Signal and wait for a worker thread to
+zRelocate.cpp:    // complete relocation of this page, and then forward the object. If
+zRelocate.cpp:    // the GC aborts the relocation phase before the page has been relocated,
+zRelocate.cpp:    // then wait return false and we just forward the object in-place.
+zRelocate.cpp:      // Prevent repeated queueing and logging if we have aborted
+zRelocate.cpp:      // Forward object in-place
+zRelocate.cpp:  // Forward object
+zRelocate.cpp:    // Simulate failure to allocate a new page. This will
+zRelocate.cpp:    // cause the page being relocated to be relocated in-place.
+zRelocate.cpp:  // Free target page if it is empty. We can end up with an empty target
+zRelocate.cpp:  // page if we allocated a new target page, and then lost the race to
+zRelocate.cpp:  // relocate the remaining objects, leaving the target page empty when
+zRelocate.cpp:  // relocation completed.
+zRelocate.cpp:      // Retire the old target page
+zRelocate.cpp:    // Does nothing
+zRelocate.cpp:    // Wait for any ongoing in-place relocation to complete
+zRelocate.cpp:    // Allocate a new page only if the shared page is the same as the
+zRelocate.cpp:    // current target page. The shared page will be different from the
+zRelocate.cpp:    // current target page if another thread shared a page, or allocated
+zRelocate.cpp:    // a new page.
+zRelocate.cpp:      // This thread is responsible for retiring the shared target page
+zRelocate.cpp:    // Does nothing
+zRelocate.cpp:    // Lookup forwarding
+zRelocate.cpp:        // Already relocated
+zRelocate.cpp:    // Allocate object
+zRelocate.cpp:      // Allocation failed
+zRelocate.cpp:    // Copy object. Use conjoint copying if we are relocating
+zRelocate.cpp:    // in-place and the new object overlaps with the old object.
+zRelocate.cpp:    // Insert forwarding
+zRelocate.cpp:      // Already relocated, undo allocation
+zRelocate.cpp:    // Old-to-old relocation - move existing remset bits
+zRelocate.cpp:    // If this is called for an in-place relocated page, then this code has the
+zRelocate.cpp:    // responsibility to clear the old remset bits. Extra care is needed because:
+zRelocate.cpp:    //
+zRelocate.cpp:    // 1) The to-object copy can overlap with the from-object copy
+zRelocate.cpp:    // 2) Remset bits of old objects need to be cleared
+zRelocate.cpp:    //
+zRelocate.cpp:    // A watermark is used to keep track of how far the old remset bits have been removed.
+zRelocate.cpp:      // Make sure remset entries of dead objects are cleared
+zRelocate.cpp:    // Note: even with in-place relocation, the to_page could be another page
+zRelocate.cpp:    // Uses _relaxed version to handle that in-place relocation resets _top
+zRelocate.cpp:    // Read the size from the to-object, since the from-object
+zRelocate.cpp:    // could have been overwritten during in-place relocation.
+zRelocate.cpp:    // If a young generation collection started while the old generation
+zRelocate.cpp:    // relocated  objects, the remember set bits were flipped from "current"
+zRelocate.cpp:    // to "previous".
+zRelocate.cpp:    //
+zRelocate.cpp:    // We need to select the correct remembered sets bitmap to ensure that the
+zRelocate.cpp:    // old remset bits are found.
+zRelocate.cpp:    //
+zRelocate.cpp:    // Note that if the young generation marking (remset scanning) finishes
+zRelocate.cpp:    // before the old generation relocation has relocated this page, then the
+zRelocate.cpp:    // young generation will visit this page's previous remembered set bits and
+zRelocate.cpp:    // moved them over to the current bitmap.
+zRelocate.cpp:    //
+zRelocate.cpp:    // If the young generation runs multiple cycles while the old generation is
+zRelocate.cpp:    // relocating, then the first cycle will have consume the the old remset,
+zRelocate.cpp:    // bits and moved associated objects to a new old page. The old relocation
+zRelocate.cpp:    // could find either the the two bitmaps. So, either it will find the original
+zRelocate.cpp:    // remset bits for the page, or it will find an empty bitmap for the page. It
+zRelocate.cpp:    // doesn't matter for correctness, because the young generation marking has
+zRelocate.cpp:    // already taken care of the bits.
+zRelocate.cpp:        // Need to forget the bit in the from-page. This is performed during
+zRelocate.cpp:        // in-place relocation, which will slide the objects in the current page.
+zRelocate.cpp:      // Add remset entry in the to-page
+zRelocate.cpp:        // Young generation remembered set scanning needs to know about this
+zRelocate.cpp:        // field. It will take responsibility to add a new remember set entry if needed.
+zRelocate.cpp:      // Record that the code above cleared all remset bits inside the from-object
+zRelocate.cpp:      // Already has a remset entry
+zRelocate.cpp:      // No need to remap it is already load good
+zRelocate.cpp:      // Eagerly remap to skip adding a remset entry just to get deferred remapping
+zRelocate.cpp:      // Object isn't being relocated
+zRelocate.cpp:        // Not young - eagerly remap to skip adding a remset entry just to get deferred remapping
+zRelocate.cpp:      // Object has already been relocated
+zRelocate.cpp:        // Not young - eagerly remap to skip adding a remset entry just to get deferred remapping
+zRelocate.cpp:    // Object has not been relocated yet
+zRelocate.cpp:    // Don't want to eagerly relocate objects, so just add a remset
+zRelocate.cpp:      // Need to deal with remset when moving stuff to old
+zRelocate.cpp:    // Promotions happen through a new cloned page
+zRelocate.cpp:      // Register the the promotion
+zRelocate.cpp:      // Allocate a new target page, or if that fails, use the page being
+zRelocate.cpp:      // relocated as the new target, which will cause it to be relocated
+zRelocate.cpp:      // in-place.
+zRelocate.cpp:      // Start in-place relocation to block other threads from accessing
+zRelocate.cpp:      // the page, or its forwarding table, until it has been released
+zRelocate.cpp:      // (relocation completed).
+zRelocate.cpp:    // Report statistics on-behalf of non-worker threads
+zRelocate.cpp:    // Check if we should abort
+zRelocate.cpp:    // Relocate objects
+zRelocate.cpp:    // Verify
+zRelocate.cpp:    // Deal with in-place relocation
+zRelocate.cpp:      // We are done with the from_space copy of the page
+zRelocate.cpp:    // Publish relocated remembered fields to the young collector.
+zRelocate.cpp:    // Needs to be done before the page is released.
+zRelocate.cpp:    // Release relocated page
+zRelocate.cpp:      // The relocated page has been relocated in-place and should not
+zRelocate.cpp:      // be freed. Keep it as target page until it is full, and offer to
+zRelocate.cpp:      // share it with other worker threads.
+zRelocate.cpp:      // Detach and free relocated page
+zRelocate.cpp:      // Relocate page
+zRelocate.cpp:      // Prioritize relocation of pages other threads are waiting for
+zRelocate.cpp:      // Check if we should resize threads
+zRelocate.cpp:    // Already has a remset entry
+zRelocate.cpp:  // Remset entries are used for two reasons:
+zRelocate.cpp:  // 1) Young marking old-to-young pointer roots
+zRelocate.cpp:  // 2) Deferred remapping of stale old-to-young pointers
+zRelocate.cpp:  //
+zRelocate.cpp:  // This load barrier will up-front perform the remapping of (2),
+zRelocate.cpp:  // and the code below only has to make sure we register up-to-date
+zRelocate.cpp:  // old-to-young pointers for (1).
+zRelocate.cpp:    // No need for remset entries for NULL pointers
+zRelocate.cpp:    // No need for remset entries for pointers to old gen
+zRelocate.cpp:    // Install the store buffer's base pointers before the
+zRelocate.cpp:    // relocate task destroys the liveness information in
+zRelocate.cpp:    // the relocated pages.
+zRelocate.cpp:      // Figure out if this is proper promotion
+zRelocate.cpp:        // Before promoting an object (and before relocate start), we must ensure that all
+zRelocate.cpp:        // contained zpointers are store good. The marking code ensures that for non-null
+zRelocate.cpp:        // pointers, but null pointers are ignored. This code ensures that even null pointers
+zRelocate.cpp:        // are made store good, for the promoted objects.
+zRelocate.cpp:      // Logging
+zRelocate.cpp:      // Setup to-space page
+zRelocate.cpp:        // Defer promoted page registration times the lock is taken
+zRelocationSet.cpp:      // Before promoting an object (and before relocate start), we must ensure that all
+zRelocationSet.cpp:      // contained zpointers are store good. The marking code ensures that for non-null
+zRelocationSet.cpp:      // pointers, but null pointers are ignored. This code ensures that even null pointers
+zRelocationSet.cpp:      // are made store good, for the promoted objects.
+zRelocationSet.cpp:    // Reset the allocator to have room for the relocation
+zRelocationSet.cpp:    // set, all forwardings, and all forwarding entries.
+zRelocationSet.cpp:    // Allocate relocation set
+zRelocationSet.cpp:    // Allocate and install forwardings for small pages
+zRelocationSet.cpp:    // Allocate and install forwardings for medium pages
+zRelocationSet.cpp:  // Install relocation set
+zRelocationSet.cpp:  // Update statistics
+zRelocationSet.cpp:    // Delete non-relocating promoted pages from last cycle
+zRelocationSet.cpp:  // Destroy forwardings
+zRelocationSetSelector.cpp:  // Medium pages are disabled when their page size is zero
+zRelocationSetSelector.cpp:  // Large pages are not selectable
+zRelocationSetSelector.cpp:  // Semi-sort live pages by number of live bytes in ascending order
+zRelocationSetSelector.cpp:  // Partition slots/fingers
+zRelocationSetSelector.cpp:  // Calculate partition slots
+zRelocationSetSelector.cpp:  // Calculate partition fingers
+zRelocationSetSelector.cpp:  // Allocate destination array
+zRelocationSetSelector.cpp:  // Sort pages into partitions
+zRelocationSetSelector.cpp:  // Calculate the number of pages to relocate by successively including pages in
+zRelocationSetSelector.cpp:  // a candidate relocation set and calculate the maximum space requirement for
+zRelocationSetSelector.cpp:  // their live objects.
+zRelocationSetSelector.cpp:    // Add page to the candidate relocation set
+zRelocationSetSelector.cpp:    // Calculate the maximum number of pages needed by the candidate relocation set.
+zRelocationSetSelector.cpp:    // By subtracting the object size limit from the pages size we get the maximum
+zRelocationSetSelector.cpp:    // number of pages that the relocation set is guaranteed to fit in, regardless
+zRelocationSetSelector.cpp:    // of in which order the objects are relocated.
+zRelocationSetSelector.cpp:    // Calculate the relative difference in reclaimable space compared to our
+zRelocationSetSelector.cpp:    // currently selected final relocation set. If this number is larger than the
+zRelocationSetSelector.cpp:    // acceptable fragmentation limit, then the current candidate relocation set
+zRelocationSetSelector.cpp:    // becomes our new final relocation set.
+zRelocationSetSelector.cpp:  // Finalize selection
+zRelocationSetSelector.cpp:  // Update statistics
+zRelocationSetSelector.cpp:    // Mark pages as not selected
+zRelocationSetSelector.cpp:  // Send event
+zRelocationSetSelector.cpp:  // Select pages to relocate. The resulting relocation set will be
+zRelocationSetSelector.cpp:  // sorted such that medium pages comes first, followed by small
+zRelocationSetSelector.cpp:  // pages. Pages within each page group will be semi-sorted by live
+zRelocationSetSelector.cpp:  // bytes in ascending order. Relocating pages in this order allows
+zRelocationSetSelector.cpp:  // us to start reclaiming memory more quickly.
+zRelocationSetSelector.cpp:  // Select pages from each group
+zRelocationSetSelector.cpp:  // Send event
+zRelocationSetSelector.inline.hpp:  // check against fragmentation limit
+zRemembered.cpp:  // The array contains duplicated from_addr values. Cache expensive operations.
+zRemembered.cpp:      // Relocate object to new location
+zRemembered.cpp:      // Figure out size
+zRemembered.cpp:    // Calculate how far into the from-object the remset entry is
+zRemembered.cpp:    // The 'containing' could contain mismatched (addr, addr_field).
+zRemembered.cpp:    // Need to check if the field was within the reported object.
+zRemembered.cpp:      // Calculate the corresponding address in the to-object
+zRemembered.cpp:    // If the old generation collection is not in the relocation phase, then it
+zRemembered.cpp:    // will not need any synchronization on its forwardings.
+zRemembered.cpp:    // This page was provably not part of the old relocation set
+zRemembered.cpp:    // Safe to scan
+zRemembered.cpp:  // If we get, we know that the old collection is concurrently relocating
+zRemembered.cpp:  // objects. We need to be extremely careful not to scan a page that is
+zRemembered.cpp:  // concurrently being in-place relocated because it's objects and previous
+zRemembered.cpp:  // bits could be concurrently be moving around.
+zRemembered.cpp:  //
+zRemembered.cpp:  // Before calling this function ZRemembered::scan_forwarding ensures
+zRemembered.cpp:  // that all forwardings that have not already been fully relocated,
+zRemembered.cpp:  // will have had their "previous" remembered set bits scanned.
+zRemembered.cpp:  //
+zRemembered.cpp:  // The current page we're currently scanning could either be the same page
+zRemembered.cpp:  // that was found during scan_forwarding, or it could have been replaced
+zRemembered.cpp:  // by a new "allocating" page. There are two situations we have to consider:
+zRemembered.cpp:  //
+zRemembered.cpp:  // 1) If it is a proper new allocating page, then all objects where copied
+zRemembered.cpp:  // after scan_forwarding ran, and we are guaranteed that no "previous"
+zRemembered.cpp:  // remembered set bits are set. So, there's no need to scan this page.
+zRemembered.cpp:  //
+zRemembered.cpp:  // 2) If this is an in-place relocated page, then the entire page could
+zRemembered.cpp:  // be concurrently relocated. Meaning that both objects and previous
+zRemembered.cpp:  // remembered set bits could be moving around. However, if the in-place
+zRemembered.cpp:  // relocation is ongoing, we've already scanned all relevant "previous"
+zRemembered.cpp:  // bits when calling scan_forwarding. So, this page *must* not be scanned.
+zRemembered.cpp:  //
+zRemembered.cpp:  // Don't scan the page.
+zRemembered.cpp:    // We don't have full liveness info - scan all remset entries
+zRemembered.cpp:    // We have full liveness info - Only scan remset entries in live objects
+zRemembered.cpp:    // All objects are dead - do nothing
+zRemembered.cpp:      // Install into max array
+zRemembered.cpp:          // Slid to the side
+zRemembered.cpp:          // Install
+zRemembered.cpp:    // We don't want to wait for the old relocation to finish and publish all
+zRemembered.cpp:    // relocated remembered fields. Reject its fields and collect enough data
+zRemembered.cpp:    // up-front.
+zRemembered.cpp:    // Collect all remset info while the page is retained
+zRemembered.cpp:    // Relocate (and mark) while page is released, to prevent
+zRemembered.cpp:    // retain deadlock when relocation threads in-place relocate.
+zRemembered.cpp:    // The page has been released. If the page was relocated while this young
+zRemembered.cpp:    // generation collection was running, the old generation relocation will
+zRemembered.cpp:    // have published all addresses of fields that had a remembered set entry.
+zRemembered.cpp:        // Visit all entries pointing into young gen
+zRemembered.cpp:        // ... and as a side-effect clear the previous entries
+zRemembered.hpp:  // Add to remembered set
+zRemembered.hpp:  // Scan all remembered sets
+zRemembered.hpp:  // Save the current remembered sets,
+zRemembered.hpp:  // and switch over to empty remembered sets.
+zRemembered.hpp:  // Scan a remembered set entry
+zRemembered.hpp:  // Verification
+zRememberedSet.cpp:  // Defer initialization of the bitmaps until the owning
+zRememberedSet.cpp:  // page becomes old and its remembered set is initialized.
+zRememberedSet.cpp:  // The bitmaps only need to be resized if remset has been initialized,
+zRememberedSet.cpp:  // and hence the bitmaps have been initialized.
+zRememberedSet.cpp:  // Note: to skip having to read the contents of the heap, when collecting the
+zRememberedSet.cpp:  // containing information, this code doesn't read the size of the objects and
+zRememberedSet.cpp:  // therefore doesn't filter out remset bits that belong to dead objects.
+zRememberedSet.cpp:  // The (addr, addr_field) pair will contain the nearest live object, of a
+zRememberedSet.cpp:  // given remset bit. Users of 'containing' need to do the filtering.
+zRememberedSet.cpp:      // No more remset bits in the obj
+zRememberedSet.cpp:      // Found no live object
+zRememberedSet.cpp:    // Found live object. Not necessarily the one that originally owned the remset bit.
+zRememberedSet.cpp:    // Don't scan inside the object in the main iterator
+zRememberedSet.cpp:    // Note: Can't use -1, since this might be the first object in the page.
+zRememberedSet.cpp:    // Scan inside the object iterator
+zRememberedSet.cpp:    // Skip field outside object
+zRememberedSet.cpp:  // No more entries found
+zRememberedSet.hpp:  // Visit all set offsets.
+zRememberedSet.inline.hpp:  // One bit per possible oop* address
+zRememberedSet.inline.hpp:  // One bit per possible oop* address
+zResurrection.cpp:  // No need for anything stronger than a relaxed store here.
+zResurrection.cpp:  // The preceeding handshake makes sure that all non-strong
+zResurrection.cpp:  // oops have already been healed at this point.
+zRootsIterator.cpp:  // The resource mark is needed because interpreter oop maps are
+zRootsIterator.cpp:  // not reused in concurrent mode. Instead, they are temporary and
+zRootsIterator.cpp:  // resource allocated.
+zRuntimeWorkers.cpp:  // Initialize worker threads
+zServiceability.cpp:    // generation.0
+zServiceability.cpp:    // generation.1
+zServiceability.cpp:    // generation.0.space.0
+zServiceability.cpp:    // generation.1.space.0
+zServiceability.cpp:    // gc.collector.0
+zServiceability.cpp:    // gc.collector.2
+zServiceability.cpp:  // We report pauses at the minor/major collection level instead
+zServiceability.cpp:  // of the young/old level. At the call-site where ZServiceabilityPauseTracer
+zServiceability.cpp:  // is used, we don't have that information readily available, so
+zServiceability.cpp:  // we let ZServiceabilityCycleTracer keep track of that.
+zStackWatermark.cpp:    // First watermark is fake and setup to be replaced at next phase shift
+zStackWatermark.cpp:    // This watermark was completed
+zStackWatermark.cpp:    // The other watermark was completed
+zStackWatermark.cpp:  // Compare the two
+zStackWatermark.cpp:  // Previous color
+zStackWatermark.cpp:  // If the prev_color is still the last saved color watermark, then processing has not started.
+zStackWatermark.cpp:    // Nothing was processed in the previous phase, so there's no need to save a watermark for it.
+zStackWatermark.cpp:    // Must have been a remapped phase, the other phases are explicitly completed by the GC.
+zStackWatermark.cpp:  // Previous watermark
+zStackWatermark.cpp:  // Create a new color watermark to describe the old watermark
+zStackWatermark.cpp:  // Find the location of the oldest watermark that it covers, and thus can replace
+zStackWatermark.cpp:  // Update top
+zStackWatermark.cpp:    // Found one to replace
+zStackWatermark.cpp:    // Found none too replace - push it to the top
+zStackWatermark.cpp:  // Install old watermark
+zStackWatermark.cpp:  // Process the non-frame part of the thread
+zStackWatermark.cpp:  // Verification of frames is done after processing of the "head" (no_frames).
+zStackWatermark.cpp:  // The reason is that the exception oop is fiddled with during frame processing.
+zStackWatermark.cpp:  // ZVerify::verify_thread_frames_bad(_jt);
+zStackWatermark.cpp:  // Update thread-local masks
+zStackWatermark.cpp:  // Retire TLAB
+zStackWatermark.cpp:  // Prepare store barrier buffer for new GC phase
+zStackWatermark.cpp:  // Publishes the processing start to concurrent threads
+zStackWatermark.hpp:  // Stores old watermarks, which describes the
+zStackWatermark.hpp:  // colors of the non-processed part of the stack.
+zStat.cpp:    // Insert sample
+zStat.cpp:    // Adjust accumulated
+zStat.cpp:    // Adjust total
+zStat.cpp:      // Found new max
+zStat.cpp:      // Removed old max, reset and find new max
+zStat.cpp:    // Adjust next
+zStat.cpp:      // Clear accumulated
+zStat.cpp:      // Became full
+zStat.cpp:    // Not yet full
+zStat.cpp:  // Finalize and align CPU offset
+zStat.cpp:  // Allocation aligned memory
+zStat.cpp:      // First sort by group, then by name
+zStat.cpp:    // Overlap found
+zStat.cpp:  // No overlap
+zStat.cpp:  // Find all overlapping pauses
+zStat.cpp:      // No overlap
+zStat.cpp:  // Calculate MMU
+zStat.cpp:  // Add pause
+zStat.cpp:  // Recalculate MMUs
+zStat.cpp:  // Track max pause time
+zStat.cpp:  // Track minimum mutator utilization
+zStat.cpp:  // This is called from sensitive contexts, for example before an allocation stall
+zStat.cpp:  // has been resolved. This means we must not access any oops in here since that
+zStat.cpp:  // could lead to infinite recursion. Without access to the thread name we can't
+zStat.cpp:  // really log anything useful here.
+zStat.cpp:      // Not max
+zStat.cpp:      // Success
+zStat.cpp:    // Retry
+zStat.cpp:    // No need for sampling yet
+zStat.cpp:    // Someone beat us to it
+zStat.cpp:    // Someone beat us to it
+zStat.cpp:    // Avoid sampling nonsense allocation rates
+zStat.cpp:  // Sample counters
+zStat.cpp:  // Collect samples
+zStat.cpp:  // Print
+zStat.cpp:  // Main loop
+zStat.cpp:      // Insert space between columns
+zStat.cpp:        // Fill empty space
+zStat.cpp:        // Line too long
+zStat.cpp:        // Short line, move all to right
+zStat.cpp:        // Fill empty space
+zStat.cpp:        // Line too long
+zStat.cpp:        // Short line, move all to center
+zStat.cpp:        // Fill empty spaces
+zStat.cpp:  // Calculate serial and parallelizable GC cycle times
+zStat.cpp:  // The times are considered trustable if we
+zStat.cpp:  // have completed at least one warmup cycle.
+zStat.cpp:    // No end recorded yet, return time since VM start
+zStat.cpp:    // No end recorded yet, return time since VM start
+zStat.cpp:  // The amount of allocated memory between point A and B is used(B) - used(A).
+zStat.cpp:  // However, we might also have reclaimed memory between point A and B. This
+zStat.cpp:  // means the current amount of used memory must be incremented by the amount
+zStat.cpp:  // reclaimed, so that used(B) represents the amount of used memory we would
+zStat.cpp:  // have had if we had not reclaimed anything.
+zStoreBarrierBuffer.cpp:    // Color with the last processed color
+zStoreBarrierBuffer.cpp:    // Look up the generation that thinks that this pointer is not
+zStoreBarrierBuffer.cpp:    // load good and check if the page is being relocated.
+zStoreBarrierBuffer.cpp:      // Page is being relocated
+zStoreBarrierBuffer.cpp:      // Page is not being relocated
+zStoreBarrierBuffer.cpp:  // Use a lock since both the GC and the Java thread race to install the base pointers
+zStoreBarrierBuffer.cpp:  // This is used as a claim mechanism to make sure that we only install the base pointers once
+zStoreBarrierBuffer.cpp:  // Calculate field offset before p_base is remapped
+zStoreBarrierBuffer.cpp:  // Remap local-copy of base pointer
+zStoreBarrierBuffer.cpp:  // Retype now that the address is known to point to the correct address
+zStoreBarrierBuffer.cpp:  // Calculate remapped field address
+zStoreBarrierBuffer.cpp:    // All pointers are already remapped
+zStoreBarrierBuffer.cpp:    // Page is not part of the relocation set
+zStoreBarrierBuffer.cpp:  // Relocate the base object and calculate the remapped p
+zStoreBarrierBuffer.cpp:    // Only need remset entries for old objects
+zStoreBarrierBuffer.cpp:    // When young mark starts we "flip" the remembered sets. The remembered
+zStoreBarrierBuffer.cpp:    // sets used before the young mark start becomes read-only and used by
+zStoreBarrierBuffer.cpp:    // the GC to scan for old-to-young pointers to use as marking roots.
+zStoreBarrierBuffer.cpp:    //
+zStoreBarrierBuffer.cpp:    // Entries in the store buffer that were added before the mark young start,
+zStoreBarrierBuffer.cpp:    // were supposed to be part of the remembered sets that the GC scans.
+zStoreBarrierBuffer.cpp:    // However, it is too late to add those entries at this point, so instead
+zStoreBarrierBuffer.cpp:    // we perform the GC remembered set scanning up-front here.
+zStoreBarrierBuffer.cpp:    // The remembered set wasn't flipped in this phase shift,
+zStoreBarrierBuffer.cpp:    // so just add the remembered set entry.
+zStoreBarrierBuffer.cpp:  // Young collections can start during old collections, but not the other
+zStoreBarrierBuffer.cpp:  // way around. Therefore, only old marking can see a collection phase
+zStoreBarrierBuffer.cpp:  // shift (resulting in a call to this function).
+zStoreBarrierBuffer.cpp:  //
+zStoreBarrierBuffer.cpp:  // Stores before the marking phase started is not a part of the SATB snapshot,
+zStoreBarrierBuffer.cpp:  // and therefore shouldn't be used for marking.
+zStoreBarrierBuffer.cpp:  //
+zStoreBarrierBuffer.cpp:  // Locations in the young generation are not part of the old marking.
+zStoreBarrierBuffer.cpp:  // Install all base pointers for relocation
+zStoreBarrierBuffer.cpp:      // Potentially remap p
+zStoreBarrierBuffer.cpp:      // Check if p matches
+zStoreBarrierBuffer.hpp:  // Color from previous phase this buffer was processed
+zStoreBarrierBuffer.hpp:  // Use as a claim mechansim for installing base pointers
+zStoreBarrierBuffer.hpp:  // sizeof(ZStoreBarrierEntry) scaled index growing downwards
+zStoreBarrierBuffer.hpp:  // Check if p is contained in any store barrier buffer entry in the system
+zUncoloredRoot.hpp:  // Operations to be used on oops that are known to be load good
+zUncoloredRoot.hpp:  // Operations on roots, with an externally provided color
+zUncoloredRoot.hpp:  // Cast needed when ZGC interfaces with the rest of the JVM,
+zUncoloredRoot.hpp:  // which is agnostic to ZGC's oop type system.
+zUncoloredRoot.inline.hpp:  // Nothing to do for nulls
+zUncoloredRoot.inline.hpp:  // Make load good
+zUncoloredRoot.inline.hpp:  // Apply function
+zUncoloredRoot.inline.hpp:  // Non-atomic healing helps speed up root scanning. This is safe to do
+zUncoloredRoot.inline.hpp:  // since we are always healing roots in a safepoint, or under a lock,
+zUncoloredRoot.inline.hpp:  // which ensures we are never racing with mutators modifying roots while
+zUncoloredRoot.inline.hpp:  // we are healing them. It's also safe in case multiple GC threads try
+zUncoloredRoot.inline.hpp:  // to heal the same root if it is aligned, since they would always heal
+zUncoloredRoot.inline.hpp:  // the root in the same way and it does not matter in which order it
+zUncoloredRoot.inline.hpp:  // happens. For misaligned oops, there needs to be mutual exclusion.
+zUncommitter.cpp:      // Uncommit chunk
+zUncommitter.cpp:        // Done
+zUncommitter.cpp:      // Update statistics
+zUncommitter.cpp:      // Send event
+zUnload.cpp:    // Create local, aligned root
+zUnload.cpp:      // Disarmed nmethods are alive
+zUnload.cpp:  // Resize and verify metaspace
+zUnmapper.cpp:  // Unmap and destroy
+zUnmapper.cpp:  // Send event
+zUnmapper.cpp:  // Enqueue for asynchronous unmap and destroy
+zUnmapper.cpp:      // Stop
+zUtils.hpp:  // Thread
+zUtils.hpp:  // Allocation
+zUtils.hpp:  // Size conversion
+zUtils.hpp:  // Object
+zUtils.hpp:  // Memory
+zValue.inline.hpp:  // Allocate entry in existing memory block
+zValue.inline.hpp:    // Success
+zValue.inline.hpp:  // Allocate new block of memory
+zValue.inline.hpp:  // Retry allocation
+zValue.inline.hpp:  // Initialize all instances
+zValue.inline.hpp:  // Initialize all instances
+zVerify.cpp:      // Old to old pointers are allowed to have bad young bits
+zVerify.cpp:        // If young collection was aborted, the GC does not guarantee
+zVerify.cpp:        // that all old-to-young pointers have remembered set entry.
+zVerify.cpp:    //guarantee(ZPointer::is_store_good(o) || ZPointer::is_marked_finalizable(o), BAD_OOP_ARG(o, p));
+zVerify.cpp:      // Skip verifying nulls
+zVerify.cpp:      // Minor collections could have relocated the object;
+zVerify.cpp:      // use load barrier to find correct object.
+zVerify.cpp:      // Don't know the state of the oop
+zVerify.cpp:        // it looks like a valid colored oop;
+zVerify.cpp:        // use load barrier to find correct object.
+zVerify.cpp:      // We should never encounter finalizable oops through strong
+zVerify.cpp:      // paths. This assumes we have only visited strong roots.
+zVerify.cpp:      //z_verify_possibly_weak_oop(p);
+zVerify.cpp:      // We should never encounter finalizable oops through strong
+zVerify.cpp:      // paths. This assumes we have only visited strong roots.
+zVerify.cpp:      // Can't verify
+zVerify.cpp:    // Verify that its pointers are sane
+zVerify.cpp:      // Young object - no verification
+zVerify.cpp:  // Note that object verification will fix the pointers and
+zVerify.cpp:  // only verify that the resulting objects are sane.
+zVerify.cpp:  // The verification VM_Operation doesn't start the thread processing.
+zVerify.cpp:  // Do it here, after the roots have been verified.
+zVerify.cpp:  // Verify strong roots
+zVerify.cpp:  // Verify all strong roots and strong references
+zVerify.cpp:    // Workaround OopMapCacheAllocation_lock reordering with the StackWatermark_lock
+zVerify.cpp:  // Verify all roots and all references
+zVirtualMemory.cpp:  // Initialize platform specific parts before reserving address space
+zVirtualMemory.cpp:  // Reserve address space
+zVirtualMemory.cpp:  // Initialize platform specific parts after reserving address space
+zVirtualMemory.cpp:  // Successfully initialized
+zVirtualMemory.cpp:    // Too small
+zVirtualMemory.cpp:    // Too small
+zVirtualMemory.cpp:  // Divide and conquer
+zVirtualMemory.cpp:  // Don't try to reserve address ranges smaller than 1% of the requested size.
+zVirtualMemory.cpp:  // This avoids an explosion of reservation attempts in case large parts of the
+zVirtualMemory.cpp:  // address space is already occupied.
+zVirtualMemory.cpp:  // Reserve size somewhere between [0, ZAddressOffsetMax)
+zVirtualMemory.cpp:  // Reserve address views
+zVirtualMemory.cpp:  // Reserve address space
+zVirtualMemory.cpp:  // Register address views with native memory tracker
+zVirtualMemory.cpp:  // Make the address range free
+zVirtualMemory.cpp:  // Allow at most 8192 attempts spread evenly across [0, ZAddressOffsetMax)
+zVirtualMemory.cpp:      // Success
+zVirtualMemory.cpp:  // Failed
+zVirtualMemory.cpp:  // Prefer a contiguous address space
+zVirtualMemory.cpp:    // Fall back to a discontiguous address space
+zVirtualMemory.cpp:  // Record reserved
+zVirtualMemory.cpp:  // Small pages are allocated at low addresses, while medium/large pages
+zVirtualMemory.cpp:  // are allocated at high addresses (unless forced to be at a low address).
+zVirtualMemory.hpp:  // Platform specific implementation
+zWorkers.cpp:  // Initialize worker threads
+zWorkers.cpp:    // Run task
+zWorkers.cpp:      // Task completed
+zWorkers.cpp:    // Restart task with requested number of active workers
+zWorkers.cpp:  // Get and set number of active workers
+zWorkers.cpp:  // Execute task using all workers
+zWorkers.cpp:  // Restore number of active workers
+zWorkers.cpp:    // If the workers are not active, it isn't safe to read stats
+zWorkers.cpp:    // from the stat_cycle, so return early.
+zWorkers.cpp:    // Already requested
+zWorkers.hpp:  // Worker resizing

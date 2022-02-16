@@ -1,0 +1,726 @@
+vmStructs_z.hpp:// Expose some ZGC globals to the SA agent.
+zAbort.hpp:// Macro to execute a abortion check
+zAddress.hpp:// One bit that denotes where the heap start. All uncolored
+zAddress.hpp:// oops have this bit set, plus an offset within the heap.
+zAddress.hpp:// Describes the maximal offset inside the heap.
+zAddress.hpp:// Layout of metadata bits in colored pointer / zpointer.
+zAddress.hpp://
+zAddress.hpp:// A zpointer is a combination of the address bits (heap base bit + offset)
+zAddress.hpp:// and two low-order metadata bytes, with the following layout:
+zAddress.hpp://
+zAddress.hpp:// RRRRMMmmFFrr0000
+zAddress.hpp:// ****               : Used by load barrier
+zAddress.hpp:// **********         : Used by mark barrier
+zAddress.hpp:// ************       : Used by store barrier
+zAddress.hpp://             ****   : Reserved bits
+zAddress.hpp://
+zAddress.hpp:// The table below describes what each color does.
+zAddress.hpp://
+zAddress.hpp:// +-------------+-------------------+--------------------------+
+zAddress.hpp:// | Bit pattern | Description       | Included colors          |
+zAddress.hpp:// +-------------+-------------------+--------------------------+
+zAddress.hpp:// |     rr      | Remembered bits   | Remembered[0, 1]         |
+zAddress.hpp:// +-------------+-------------------+--------------------------+
+zAddress.hpp:// |     FF      | Finalizable bits  | Finalizable[0, 1]        |
+zAddress.hpp:// +-------------+-------------------+--------------------------+
+zAddress.hpp:// |     mm      | Marked young bits | MarkedYoung[0, 1]        |
+zAddress.hpp:// +-------------+-------------------+--------------------------+
+zAddress.hpp:// |     MM      | Marked old bits   | MarkedOld[0, 1]          |
+zAddress.hpp:// +-------------+-------------------+--------------------------+
+zAddress.hpp:// |    RRRR     | Remapped bits     | Remapped[00, 01, 10, 11] |
+zAddress.hpp:// +-------------+-------------------+--------------------------+
+zAddress.hpp://
+zAddress.hpp:// The low order zero address bits sometimes overlap with the high order zero metadata
+zAddress.hpp:// bits, depending on the remapped bit being set.
+zAddress.hpp://
+zAddress.hpp://             vvv- overlapping address and metadata zeros
+zAddress.hpp://    aaa...aaa0001MMmmFFrr0000 = Remapped00 zpointer
+zAddress.hpp://
+zAddress.hpp://             vv-- overlapping address and metadata zeros
+zAddress.hpp://   aaa...aaa00010MMmmFFrr0000 = Remapped01 zpointer
+zAddress.hpp://
+zAddress.hpp://             v--- overlapping address and metadata zero
+zAddress.hpp://  aaa...aaa000100MMmmFFrr0000 = Remapped10 zpointer
+zAddress.hpp://
+zAddress.hpp://             ---- no overlapping address and metadata zeros
+zAddress.hpp:// aaa...aaa0001000MMmmFFrr0000 = Remapped11 zpointer
+zAddress.hpp://
+zAddress.hpp:// The overlapping is performed because the x86 JIT-compiled load barriers expect the
+zAddress.hpp:// address bits to start right after the load-good bit. It allows combining the good
+zAddress.hpp:// bit check and unmasking into a single speculative shift instruction. On AArch64 we
+zAddress.hpp:// don't do this, and hence there are no overlapping address and  metadata zeros there.
+zAddress.hpp://
+zAddress.hpp:// The remapped bits are notably not grouped into two sets of bits, one for the young
+zAddress.hpp:// collection and one for the old collection, like the other bits. The reason is that
+zAddress.hpp:// the load barrier is only compatible with bit patterns where there is a single zero in
+zAddress.hpp:// its bits of operation (the load metadata bit mask). Instead, the single bit that we
+zAddress.hpp:// set encodes the combined state of a conceptual RemappedYoung[0, 1] and
+zAddress.hpp:// RemappedOld[0, 1] pair. The encoding scheme is that the shift of the load good bit,
+zAddress.hpp:// minus the shift of the load metadata bit start encodes the numbers 0, 1, 2 and 3.
+zAddress.hpp:// These numbers in binary correspond to 00, 01, 10 and 11. The low order bit in said
+zAddress.hpp:// numbers correspond to the simulated RemappedYoung[0, 1] value, and the high order bit
+zAddress.hpp:// corresponds to the simulated RemappedOld[0, 1] value. On AArch64, the remap bits
+zAddress.hpp:// of zpointers are the complement of this bit. So there are 3 good bits and one bad bit
+zAddress.hpp:// instead. This lends itself better to AArch64 instructions.
+zAddress.hpp://
+zAddress.hpp:// We decide the bit to be taken by having the RemappedYoungMask and RemappedOldMask
+zAddress.hpp:// variables, which alternate between what two bits they accept for their corresponding
+zAddress.hpp:// old and young phase. The Remapped bit is chosen by taking the intersection of those
+zAddress.hpp:// two variables.
+zAddress.hpp://
+zAddress.hpp:// RemappedOldMask alternates between these two bit patterns:
+zAddress.hpp://
+zAddress.hpp://  RemappedOld0 => 0011
+zAddress.hpp://  RemappedOld1 => 1100
+zAddress.hpp://
+zAddress.hpp:// RemappedYoungMask alternates between these two bit patterns:
+zAddress.hpp://
+zAddress.hpp://  RemappedYoung0 => 0101
+zAddress.hpp://  RemappedYoung1 => 1010
+zAddress.hpp://
+zAddress.hpp:// The corresponding intersections look like this:
+zAddress.hpp://
+zAddress.hpp://  RemappedOld0 & RemappedYoung0 = 0001 = Remapped00
+zAddress.hpp://  RemappedOld0 & RemappedYoung1 = 0010 = Remapped01
+zAddress.hpp://  RemappedOld1 & RemappedYoung0 = 0100 = Remapped10
+zAddress.hpp://  RemappedOld1 & RemappedYoung1 = 1000 = Remapped11
+zAddress.hpp:// Reserved bits
+zAddress.hpp:// Remembered set bits
+zAddress.hpp:// Marked bits
+zAddress.hpp:// Remapped bits
+zAddress.hpp:// The shift table is tightly coupled with the zpointer layout given above
+zAddress.hpp:// Barrier metadata masks
+zAddress.hpp:// The current expected bit
+zAddress.hpp:// The current expected remap bit for the young (or old) collection is either of two bits.
+zAddress.hpp:// The other collection alternates the bits, so we need to use a mask.
+zAddress.hpp:// Good/bad masks
+zAddress.hpp:// The bad mask is 64 bit. Its low order 32 bits contain all possible value combinations
+zAddress.hpp:// that this mask will have. Therefore, the memory where the 32 low order bits are stored
+zAddress.hpp:// can be used as a 32 bit GC epoch counter, that has a different bit pattern every time
+zAddress.hpp:// the bad mask is flipped. This provides a pointer to such 32 bits.
+zAddress.hpp:// Offsets
+zAddress.hpp:// - Virtual address range offsets
+zAddress.hpp:// - Physical memory offsets
+zAddress.hpp:// Offsets including end of offset range
+zAddress.hpp:// Colored oop
+zAddress.hpp:// Uncolored oop - safe to dereference
+zAddress.hpp:// Uncolored oop - not safe to dereference, could point uncommitted memory
+zAddress.inline.hpp:// zoffset functions
+zAddress.inline.hpp:// zpointer functions
+zAddress.inline.hpp:// Is it exactly null?
+zAddress.inline.hpp:// Is it null - colored or not?
+zAddress.inline.hpp:// zaddress functions
+zAddress.inline.hpp:// zaddress_unsafe functions
+zAddress.inline.hpp:// The zaddress_unsafe type denotes that this
+zAddress.inline.hpp:// memory isn't guaranteed to be dereferenceable.
+zAddress.inline.hpp:// The containing page could have been reclaimed
+zAddress.inline.hpp:// and/or uncommitted.
+zAddress.inline.hpp://
+zAddress.inline.hpp:// The zaddress type denotes that this memory can
+zAddress.inline.hpp:// be dereferenced (runtime verified).
+zAddress.inline.hpp://
+zAddress.inline.hpp:// This function can be used when the caller guarantees
+zAddress.inline.hpp:// that addr points to dereferenceable memory. Examples
+zAddress.inline.hpp:// of cases after which this function can be used:
+zAddress.inline.hpp://
+zAddress.inline.hpp:// 1) A load good check on the colored pointer that addr was created from
+zAddress.inline.hpp:// 2) A load barrier has self-healed the pointer in addr
+zAddress.inline.hpp:// 3) A check that the addr doesn't belong to a relocation set. Since addr
+zAddress.inline.hpp://    could denote two different objects in the two generations, a check
+zAddress.inline.hpp://    against the colored pointer, that addr was created from, is needed to
+zAddress.inline.hpp://    figure out what relocation set to look in.
+zAddress.inline.hpp:// 4) From the relocation code
+zAddress.inline.hpp:// ZOffset functions
+zAddress.inline.hpp:// ZPointer functions
+zAddress.inline.hpp:// ZAddress functions
+zAllocationFlags.hpp://
+zAllocationFlags.hpp:// Allocation flags layout
+zAllocationFlags.hpp:// -----------------------
+zAllocationFlags.hpp://
+zAllocationFlags.hpp://   7     2 1 0
+zAllocationFlags.hpp://  +-----+-+-+-+
+zAllocationFlags.hpp://  |00000|1|1|1|
+zAllocationFlags.hpp://  +-----+-+-+-+
+zAllocationFlags.hpp://  |     | | |
+zAllocationFlags.hpp://  |     | | * 0-0 Non-Blocking Flag (1-bit)
+zAllocationFlags.hpp://  |     | |
+zAllocationFlags.hpp://  |     | * 1-1 GC Relocation Flag (1-bit)
+zAllocationFlags.hpp://  |     |
+zAllocationFlags.hpp://  |     * 2-2 Low Address Flag (1-bit)
+zAllocationFlags.hpp://  |
+zAllocationFlags.hpp://  * 7-3 Unused (5-bits)
+zAllocationFlags.hpp://
+zBarrier.cpp://
+zBarrier.cpp:// Weak load barrier
+zBarrier.cpp://
+zBarrier.cpp://
+zBarrier.cpp:// Clean barrier
+zBarrier.cpp://
+zBarrier.cpp://
+zBarrier.cpp:// Mark barrier
+zBarrier.cpp://
+zBarrier.cpp:// ON_WEAK barriers should only ever be applied to j.l.r.Reference.referents.
+zBarrier.hpp:// == Shift based load barrier ==
+zBarrier.hpp://
+zBarrier.hpp:// The load barriers of ZGC check if a loaded value is safe to expose or not, and
+zBarrier.hpp:// then shifts the pointer to remove metadata bits, such that it points to mapped
+zBarrier.hpp:// memory.
+zBarrier.hpp:// A pointer is safe to expose if it does not have any load-bad bits set in its
+zBarrier.hpp:// metadata bits. In the C++ code and non-nmethod generated code, that is checked
+zBarrier.hpp:// by testing the pointer value against a load-bad mask, checking that no bad bit
+zBarrier.hpp:// is set, followed by a shift, removing the metadata bits if they were good.
+zBarrier.hpp:// However, for nmethod code, the test + shift sequence is optimized in such
+zBarrier.hpp:// a way that the shift both tests if the pointer is exposable or not, and removes
+zBarrier.hpp:// the metadata bits, with the same instruction. This is a speculative optimization
+zBarrier.hpp:// that assumes that the loaded pointer is frequently going to be load-good or null
+zBarrier.hpp:// when checked. Therefore, the nmethod load barriers just apply the shift with the
+zBarrier.hpp:// current "good" shift (which is patched with nmethod entry barriers for each GC
+zBarrier.hpp:// phase). If the result of that shift was a raw NULL value, then the ZF flag is set.
+zBarrier.hpp:// If the result is a good pointer, then the very last bit that was removed by the
+zBarrier.hpp:// shift, must have been a 1, which would have set the CF flag. Therefore, the "above"
+zBarrier.hpp:// branch condition code is used to take a slowpath only iff CF == 0 and ZF == 0.
+zBarrier.hpp:// CF == 0 implies it was not a good pointer, and ZF == 0 implies the resulting address
+zBarrier.hpp:// was not a NULL value. Then we decide that the pointer is bad. This optimization
+zBarrier.hpp:// is necessary to get satisfactory performance, but does come with a few constraints:
+zBarrier.hpp:// 1) The load barrier can only recognize 4 different good patterns across all GC phases.
+zBarrier.hpp://    The reason is that when a load barrier applies the currently good shift, then
+zBarrier.hpp://    the value of said shift may differ only by 3, until we risk shifting away more
+zBarrier.hpp://    than the low order three zeroes of an addres, given a bad pointer, which would
+zBarrier.hpp://    yield spurious false positives.
+zBarrier.hpp:// 2) Those bit patterns must have only a single bit set. We achieve that by moving
+zBarrier.hpp://    non-relocation work to store barriers.
+zBarrier.hpp:// Another consequence of this speculative optimization, is that when the compiled code
+zBarrier.hpp:// takes a slow path, it needs to reload the oop, because the shifted oop is now
+zBarrier.hpp:// broken after being shifted with a different shift to what was used when the oop
+zBarrier.hpp:// was stored.
+zBarrier.inline.hpp:// A self heal must always "upgrade" the address metadata bits in
+zBarrier.inline.hpp:// accordance with the metadata bits state machine, which has the
+zBarrier.inline.hpp:// valid state transitions as described below (where N is the GC
+zBarrier.inline.hpp:// cycle).
+zBarrier.inline.hpp://
+zBarrier.inline.hpp:// Note the subtleness of overlapping GC cycles. Specifically that
+zBarrier.inline.hpp:// oops are colored Remapped(N) starting at relocation N and ending
+zBarrier.inline.hpp:// at marking N + 1.
+zBarrier.inline.hpp://
+zBarrier.inline.hpp://              +--- Mark Start
+zBarrier.inline.hpp://              | +--- Mark End
+zBarrier.inline.hpp://              | | +--- Relocate Start
+zBarrier.inline.hpp://              | | | +--- Relocate End
+zBarrier.inline.hpp://              | | | |
+zBarrier.inline.hpp:// Marked       |---N---|--N+1--|--N+2--|----
+zBarrier.inline.hpp:// Finalizable  |---N---|--N+1--|--N+2--|----
+zBarrier.inline.hpp:// Remapped     ----|---N---|--N+1--|--N+2--|
+zBarrier.inline.hpp://
+zBarrier.inline.hpp:// VALID STATE TRANSITIONS
+zBarrier.inline.hpp://
+zBarrier.inline.hpp://   Marked(N)           -> Remapped(N)
+zBarrier.inline.hpp://                       -> Marked(N + 1)
+zBarrier.inline.hpp://                       -> Finalizable(N + 1)
+zBarrier.inline.hpp://
+zBarrier.inline.hpp://   Finalizable(N)      -> Marked(N)
+zBarrier.inline.hpp://                       -> Remapped(N)
+zBarrier.inline.hpp://                       -> Marked(N + 1)
+zBarrier.inline.hpp://                       -> Finalizable(N + 1)
+zBarrier.inline.hpp://
+zBarrier.inline.hpp://   Remapped(N)         -> Marked(N + 1)
+zBarrier.inline.hpp://                       -> Finalizable(N + 1)
+zBarrier.inline.hpp://
+zBarrier.inline.hpp:// PHASE VIEW
+zBarrier.inline.hpp://
+zBarrier.inline.hpp:// ZPhase::Mark
+zBarrier.inline.hpp://   Load & Mark
+zBarrier.inline.hpp://     Marked(N)         <- Marked(N - 1)
+zBarrier.inline.hpp://                       <- Finalizable(N - 1)
+zBarrier.inline.hpp://                       <- Remapped(N - 1)
+zBarrier.inline.hpp://                       <- Finalizable(N)
+zBarrier.inline.hpp://
+zBarrier.inline.hpp://   Mark(Finalizable)
+zBarrier.inline.hpp://     Finalizable(N)    <- Marked(N - 1)
+zBarrier.inline.hpp://                       <- Finalizable(N - 1)
+zBarrier.inline.hpp://                       <- Remapped(N - 1)
+zBarrier.inline.hpp://
+zBarrier.inline.hpp://   Load(AS_NO_KEEPALIVE)
+zBarrier.inline.hpp://     Remapped(N - 1)   <- Marked(N - 1)
+zBarrier.inline.hpp://                       <- Finalizable(N - 1)
+zBarrier.inline.hpp://
+zBarrier.inline.hpp:// ZPhase::MarkComplete (Resurrection blocked)
+zBarrier.inline.hpp://   Load & Load(ON_WEAK/PHANTOM_OOP_REF | AS_NO_KEEPALIVE) & KeepAlive
+zBarrier.inline.hpp://     Marked(N)         <- Marked(N - 1)
+zBarrier.inline.hpp://                       <- Finalizable(N - 1)
+zBarrier.inline.hpp://                       <- Remapped(N - 1)
+zBarrier.inline.hpp://                       <- Finalizable(N)
+zBarrier.inline.hpp://
+zBarrier.inline.hpp://   Load(ON_STRONG_OOP_REF | AS_NO_KEEPALIVE)
+zBarrier.inline.hpp://     Remapped(N - 1)   <- Marked(N - 1)
+zBarrier.inline.hpp://                       <- Finalizable(N - 1)
+zBarrier.inline.hpp://
+zBarrier.inline.hpp:// ZPhase::MarkComplete (Resurrection unblocked)
+zBarrier.inline.hpp://   Load
+zBarrier.inline.hpp://     Marked(N)         <- Finalizable(N)
+zBarrier.inline.hpp://
+zBarrier.inline.hpp:// ZPhase::Relocate
+zBarrier.inline.hpp://   Load & Load(AS_NO_KEEPALIVE)
+zBarrier.inline.hpp://     Remapped(N)       <- Marked(N)
+zBarrier.inline.hpp://                       <- Finalizable(N)
+zBarrier.inline.hpp://
+zBarrier.inline.hpp:// Fast paths
+zBarrier.inline.hpp://
+zBarrier.inline.hpp://
+zBarrier.inline.hpp:// Slow paths
+zBarrier.inline.hpp://
+zBarrier.inline.hpp://
+zBarrier.inline.hpp:// Color functions
+zBarrier.inline.hpp://
+zBarrier.inline.hpp://
+zBarrier.inline.hpp:// Load barrier
+zBarrier.inline.hpp://
+zBarrier.inline.hpp://
+zBarrier.inline.hpp:// Load barrier on non-strong oop refs
+zBarrier.inline.hpp://
+zBarrier.inline.hpp://
+zBarrier.inline.hpp:// Clean barrier
+zBarrier.inline.hpp://
+zBarrier.inline.hpp://
+zBarrier.inline.hpp:// Mark barrier
+zBarrier.inline.hpp://
+zBarrier.inline.hpp://
+zBarrier.inline.hpp:// Mark barrier
+zBarrier.inline.hpp://
+zBarrier.inline.hpp://
+zBarrier.inline.hpp:// Store barrier
+zBarrier.inline.hpp://
+zBarrierSet.inline.hpp://
+zBarrierSet.inline.hpp:// In heap
+zBarrierSet.inline.hpp://
+zBarrierSet.inline.hpp://
+zBarrierSet.inline.hpp:// Not in heap
+zBarrierSet.inline.hpp://
+zBitField.hpp://
+zBitField.hpp://  Example
+zBitField.hpp://  -------
+zBitField.hpp://
+zBitField.hpp://  typedef ZBitField<uint64_t, uint8_t,  0,  2, 3> field_word_aligned_size;
+zBitField.hpp://  typedef ZBitField<uint64_t, uint32_t, 2, 30>    field_length;
+zBitField.hpp://
+zBitField.hpp://
+zBitField.hpp://   6                                 3 3
+zBitField.hpp://   3                                 2 1                               2 10
+zBitField.hpp://  +-----------------------------------+---------------------------------+--+
+zBitField.hpp://  |11111111 11111111 11111111 11111111|11111111 11111111 11111111 111111|11|
+zBitField.hpp://  +-----------------------------------+---------------------------------+--+
+zBitField.hpp://  |                                   |                                 |
+zBitField.hpp://  |       31-2 field_length (30-bits) *                                 |
+zBitField.hpp://  |                                                                     |
+zBitField.hpp://  |                                1-0 field_word_aligned_size (2-bits) *
+zBitField.hpp://  |
+zBitField.hpp://  * 63-32 Unused (32-bits)
+zBitField.hpp://
+zBitField.hpp://
+zBitField.hpp://  field_word_aligned_size::encode(16) = 2
+zBitField.hpp://  field_length::encode(2342) = 9368
+zBitField.hpp://
+zBitField.hpp://  field_word_aligned_size::decode(9368 | 2) = 16
+zBitField.hpp://  field_length::decode(9368 | 2) = 2342
+zBitField.hpp://
+zDirector.cpp:// Minor GC rules
+zDirector.cpp:// Major GC rules
+zForwarding.cpp://
+zForwarding.cpp:// Reference count states:
+zForwarding.cpp://
+zForwarding.cpp:// * If the reference count is zero, it will never change again.
+zForwarding.cpp://
+zForwarding.cpp:// * If the reference count is positive, it can be both retained
+zForwarding.cpp://   (increased) and released (decreased).
+zForwarding.cpp://
+zForwarding.cpp:// * If the reference count is negative, is can only be released
+zForwarding.cpp://   (increased). A negative reference count means that one or more
+zForwarding.cpp://   threads are waiting for one or more other threads to release
+zForwarding.cpp://   their references.
+zForwarding.cpp://
+zForwarding.cpp:// The reference lock is used for waiting until the reference
+zForwarding.cpp:// count has become zero (released) or negative one (claimed).
+zForwarding.cpp://
+zForwarding.cpp://
+zForwarding.cpp:// The relocated_remembered_fields are used when the old generation
+zForwarding.cpp:// collection is relocating objects, concurrently with the young
+zForwarding.cpp:// generation collection's remembered set scanning for the marking.
+zForwarding.cpp://
+zForwarding.cpp:// When the OC is relocating objects, the old remembered set bits
+zForwarding.cpp:// for the from-space objects need to be moved over to the to-space
+zForwarding.cpp:// objects.
+zForwarding.cpp://
+zForwarding.cpp:// The YC doesn't want to wait for the OC, so it eagerly helps relocating
+zForwarding.cpp:// objects with remembered set bits, so that it can perform marking on the
+zForwarding.cpp:// to-space copy of the object fields that are associated with the remembered
+zForwarding.cpp:// set bits.
+zForwarding.cpp://
+zForwarding.cpp:// This requires some synchronization between the OC and YC, and this is
+zForwarding.cpp:// mainly done via the _relocated_remembered_fields_state in each ZForwarding.
+zForwarding.cpp:// The values corresponds to:
+zForwarding.cpp://
+zForwarding.cpp:// 0: Starting state - neither OC nor YC has stated their intentions
+zForwarding.cpp:// 1: The OC has completed relocating all objects, and published an array
+zForwarding.cpp://    of all to-space fields that should have a remembered set entry.
+zForwarding.cpp:// 2: The YC found a forwarding/page that had not yet been fully relocated.
+zForwarding.cpp://    It ignored whatever fields the OC was collecting, and started figuring
+zForwarding.cpp://    it out itself.
+zForwarding.cpp:// 3: The YC found that the forwarding/page had already been relocated when
+zForwarding.cpp://    the YC started.
+zForwarding.cpp://
+zForwarding.cpp:// Central to this logic is the ZRemembered::scan_forwarding function, where
+zForwarding.cpp:// the YC tries to "retain" the forwarding/page. If it succeeds it means that
+zForwarding.cpp:// the OC has not finished (or maybe not even started) the relocation of all objects.
+zForwarding.cpp://
+zForwarding.cpp:// When the YC manages to retaining the page it will bring the state from:
+zForwarding.cpp://  0 -> 2 - Started collecting remembered set info
+zForwarding.cpp://  1 -> 2 - Rejected the OC's remembered set info
+zForwarding.cpp://  2 -> 2 - An earlier YC had already handled the remembered set info
+zForwarding.cpp://  3 ->   - Invalid state - will not happen
+zForwarding.cpp://
+zForwarding.cpp:// When the YC fails to retain the page the state transitions are:
+zForwarding.cpp:// 0 -> 3 - The page was relocated before the YC started
+zForwarding.cpp:// 1 -> 3 - The OC completed relocation before YC visited this forwarding.
+zForwarding.cpp://          The YC will use the remembered set info collected by the OC.
+zForwarding.cpp:// 2 -> 3 - A previous YC has already handled the remembered set info
+zForwarding.cpp:// 3 -> 3 - See above
+zForwarding.cpp://
+zForwarding.cpp:// The (2) state is the "dangerous" state, where both OC and YC work on
+zForwarding.cpp:// the same forwarding/page. This state is checked for in the YC remembered
+zForwarding.cpp:// set scanning code that tries to scan pages that were *not* part of the
+zForwarding.cpp:// OC relocation set.
+zForwarding.cpp://
+zForwarding.cpp:// When visiting the remembered sets of non-relocating old generation pages,
+zForwarding.cpp:// all pages with virtual address that are not part of the old relocation set
+zForwarding.cpp:// needs to be visited. Some of the virtual addresses that matches the old
+zForwarding.cpp:// relocation set will contain new pages that contain objects that were relocated
+zForwarding.cpp:// from one old region to another. If the relocation happened before the YC
+zForwarding.cpp:// started, their remembered sets need to be scanned as well. This is where things
+zForwarding.cpp:// get tricky, we need to be able to differentiate pages that were relocated before
+zForwarding.cpp:// the YC was started and those that were not. And this is where we use state (2).
+zForwarding.cpp://
+zForwarding.cpp:// State (2) denotes that whatever happened, the YC managed retained the page and
+zForwarding.cpp:// scanned the remembered set fields. If a new page has been installed to the same
+zForwarding.cpp:// address, it means that the page was installed *after* the YC was started. So,
+zForwarding.cpp:// forwardings with state (2) will be excluded from the ZRememberedScanPageTask.
+zForwarding.cpp://
+zForwarding.cpp:// It's actually important that we don't scan pages that map to the same virtual
+zForwarding.cpp:// address as the state (2) forwarding. "Normally" newly allocated pages would be fine
+zForwarding.cpp:// to visit, all their scanned remembered set bits would be 0. However, some
+zForwarding.cpp:// pages could be in-place relocated. The in-place relocated pages could be
+zForwarding.cpp:// concurrently be compacted and remembered set bits moved around. If it weren't
+zForwarding.cpp:// for those pages, we could probably simplify this by redundantly scanning the
+zForwarding.cpp:// normally allocated pages.
+zForwarding.cpp://
+zForwardingEntry.hpp://
+zForwardingEntry.hpp:// Forwarding entry layout
+zForwardingEntry.hpp:// -----------------------
+zForwardingEntry.hpp://
+zForwardingEntry.hpp://   6                  4 4
+zForwardingEntry.hpp://   3                  6 5                                                1 0
+zForwardingEntry.hpp://  +--------------------+--------------------------------------------------+-+
+zForwardingEntry.hpp://  |11111111 11111111 11|111111 11111111 11111111 11111111 11111111 1111111|1|
+zForwardingEntry.hpp://  +--------------------+--------------------------------------------------+-+
+zForwardingEntry.hpp://  |                    |                                                  |
+zForwardingEntry.hpp://  |                    |                      0-0 Populated Flag (1-bits) *
+zForwardingEntry.hpp://  |                    |
+zForwardingEntry.hpp://  |                    * 45-1 To Object Offset (45-bits)
+zForwardingEntry.hpp://  |
+zForwardingEntry.hpp://  * 63-46 From Object Index (18-bits)
+zForwardingEntry.hpp://
+zForwardingEntry.hpp:// Needed to allow atomic operations on ZForwardingEntry
+zForwarding.inline.hpp:// Returns true iff the page is being (or about to be) relocated by the OC
+zForwarding.inline.hpp:// while the YC gathered the remembered fields of the "from" page.
+z_globals.hpp:// end of GC_Z_FLAGS
+zGlobals.hpp:// Collector name
+zGlobals.hpp:// Granule shift/size
+zGlobals.hpp:// Virtual memory to physical memory ratio
+zGlobals.hpp:// Page size shifts
+zGlobals.hpp:// Page sizes
+zGlobals.hpp:// Object size limits
+zGlobals.hpp:// Object alignment shifts
+zGlobals.hpp:// Object alignments
+zGlobals.hpp:// Cache line size
+zGlobals.hpp:// Mark stack space
+zGlobals.hpp:// Mark stack and magazine sizes
+zGlobals.hpp:// Mark stripe size
+zGlobals.hpp:// Max number of mark stripes
+zGlobals.hpp:// Mark cache size
+zGlobals.hpp:// Partial array minimum size
+zGlobals.hpp:// Max number of proactive/terminate flush attempts
+zGlobals.hpp:// Try complete mark timeout
+zIndexDistributor.inline.hpp:// Using dynamically allocated objects just to be able to evaluate
+zIndexDistributor.inline.hpp:// different strategies. Revert when one has been choosen.
+zIterator.inline.hpp:// This iterator skips invisible object arrays
+zIterator.inline.hpp:// This function skips invisible roots
+zJNICritical.cpp://
+zJNICritical.cpp:// The JNI critical count reflects number of Java threads currently
+zJNICritical.cpp:// inside a JNI critical region.
+zJNICritical.cpp://
+zJNICritical.cpp:// * Normal (count >= 0). Java threads are allowed to enter and exit
+zJNICritical.cpp://   a critical region.
+zJNICritical.cpp://
+zJNICritical.cpp:// * Blocked (count == -1). No Java thread is inside a critical region,
+zJNICritical.cpp://   and no Java thread can enter a critical region.
+zJNICritical.cpp://
+zJNICritical.cpp:// * Block in progress (count < -1). Java threads are only allowed
+zJNICritical.cpp://   to exit a critical region. Attempts to enter a critical region
+zJNICritical.cpp://   will be blocked.
+zJNICritical.cpp://
+zList.hpp:// Element in a doubly linked list
+zList.hpp:// Doubly linked list
+zMark.inline.hpp:// Marking before pushing helps reduce mark stack memory usage. However,
+zMark.inline.hpp:// we only mark before pushing in GC threads to avoid burdening Java threads
+zMark.inline.hpp:// with writing to, and potentially first having to clear, mark bitmaps.
+zMark.inline.hpp://
+zMark.inline.hpp:// It's also worth noting that while marking an object can be done at any
+zMark.inline.hpp:// time in the marking phase, following an object can only be done after
+zMark.inline.hpp:// root processing has called ClassLoaderDataGraph::clear_claimed_marks(),
+zMark.inline.hpp:// since it otherwise would interact badly with claiming of CLDs.
+zMarkStackEntry.hpp://
+zMarkStackEntry.hpp:// Mark stack entry layout
+zMarkStackEntry.hpp:// -----------------------
+zMarkStackEntry.hpp://
+zMarkStackEntry.hpp://  Object entry
+zMarkStackEntry.hpp://  ------------
+zMarkStackEntry.hpp://
+zMarkStackEntry.hpp://   6
+zMarkStackEntry.hpp://   3                                                                5 4 3 2 1 0
+zMarkStackEntry.hpp://  +------------------------------------------------------------------+-+-+-+-+-+
+zMarkStackEntry.hpp://  |11111111 11111111 11111111 11111111 11111111 11111111 11111111 111|1|1|1|1|1|
+zMarkStackEntry.hpp://  +------------------------------------------------------------------+-+-+-+-+-+
+zMarkStackEntry.hpp://  |                                                                  | | | | |
+zMarkStackEntry.hpp://  |                                            4-4 Mark Flag (1-bit) * | | | |
+zMarkStackEntry.hpp://  |                                                                    | | | |
+zMarkStackEntry.hpp://  |                                    3-3 Increment Live Flag (1-bit) * | | |
+zMarkStackEntry.hpp://  |                                                                      | | |
+zMarkStackEntry.hpp://  |                                              2-2 Follow Flag (1-bit) * | |
+zMarkStackEntry.hpp://  |                                                                        | |
+zMarkStackEntry.hpp://  |                                         1-1 Partial Array Flag (1-bit) * |
+zMarkStackEntry.hpp://  |                                                                          |
+zMarkStackEntry.hpp://  |                                                   0-0 Final Flag (1-bit) *
+zMarkStackEntry.hpp://  |
+zMarkStackEntry.hpp://  * 63-5 Object Address (59-bits)
+zMarkStackEntry.hpp://
+zMarkStackEntry.hpp://
+zMarkStackEntry.hpp://  Partial array entry
+zMarkStackEntry.hpp://  -------------------
+zMarkStackEntry.hpp://
+zMarkStackEntry.hpp://   6                                 3  3
+zMarkStackEntry.hpp://   3                                 2  1                               2 1 0
+zMarkStackEntry.hpp://  +------------------------------------+---------------------------------+-+-+
+zMarkStackEntry.hpp://  |11111111 11111111 11111111 11111111 |11111111 11111111 11111111 111111|1|1|
+zMarkStackEntry.hpp://  +------------------------------------+---------------------------------+-+-+
+zMarkStackEntry.hpp://  |                                    |                                 | |
+zMarkStackEntry.hpp://  |                                    |  1-1 Partial Array Flag (1-bit) * |
+zMarkStackEntry.hpp://  |                                    |                                   |
+zMarkStackEntry.hpp://  |                                    |            0-0 Final Flag (1-bit) *
+zMarkStackEntry.hpp://  |                                    |
+zMarkStackEntry.hpp://  |                                    * 31-2 Partial Array Length (30-bits)
+zMarkStackEntry.hpp://  |
+zMarkStackEntry.hpp://  * 63-32 Partial Array Address Offset (32-bits)
+zMarkStackEntry.hpp://
+zNMethodTableEntry.hpp://
+zNMethodTableEntry.hpp:// NMethod table entry layout
+zNMethodTableEntry.hpp:// --------------------------
+zNMethodTableEntry.hpp://
+zNMethodTableEntry.hpp://   6
+zNMethodTableEntry.hpp://   3                                                                   2 1 0
+zNMethodTableEntry.hpp://  +---------------------------------------------------------------------+-+-+
+zNMethodTableEntry.hpp://  |11111111 11111111 11111111 11111111 11111111 11111111 11111111 111111|1|1|
+zNMethodTableEntry.hpp://  +---------------------------------------------------------------------+-+-+
+zNMethodTableEntry.hpp://  |                                                                     | |
+zNMethodTableEntry.hpp://  |                                      1-1 Unregistered Flag (1-bits) * |
+zNMethodTableEntry.hpp://  |                                                                       |
+zNMethodTableEntry.hpp://  |                                          0-0 Registered Flag (1-bits) *
+zNMethodTableEntry.hpp://  |
+zNMethodTableEntry.hpp://  * 63-2 NMethod Address (62-bits)
+zNMethodTableEntry.hpp://
+zRelocate.cpp:// Installs the object base pointers (object starts), for the fields written
+zRelocate.cpp:// in the store buffer. The code that searches for the object start uses that
+zRelocate.cpp:// liveness information stored in the pages. That information is lost when the
+zRelocate.cpp:// pages have been relocated and then destroyed.
+zRememberedSet.hpp:// The remembered set of a ZPage.
+zRememberedSet.hpp://
+zRememberedSet.hpp:// There's one bit per potential object field address within the ZPage.
+zRememberedSet.hpp://
+zRememberedSet.hpp:// New entries are added to the "current" active bitmap, while the
+zRememberedSet.hpp:// "previous" bitmap is used by the GC to find pointers from old
+zRememberedSet.hpp:// gen to young gen.
+zServiceability.cpp:// Class to expose perf counters used by jstat.
+zStat.cpp://
+zStat.cpp:// Stat sampler/counter data
+zStat.cpp://
+zStat.cpp://
+zStat.cpp:// Stat sampler history
+zStat.cpp://
+zStat.cpp://
+zStat.cpp:// Stat unit printers
+zStat.cpp://
+zStat.cpp://
+zStat.cpp:// Stat value
+zStat.cpp://
+zStat.cpp://
+zStat.cpp:// Stat iterable value
+zStat.cpp://
+zStat.cpp://
+zStat.cpp:// Stat sampler
+zStat.cpp://
+zStat.cpp://
+zStat.cpp:// Stat counter
+zStat.cpp://
+zStat.cpp://
+zStat.cpp:// Stat unsampled counter
+zStat.cpp://
+zStat.cpp://
+zStat.cpp:// Stat MMU (Minimum Mutator Utilization)
+zStat.cpp://
+zStat.cpp://
+zStat.cpp:// Stat phases
+zStat.cpp://
+zStat.cpp://
+zStat.cpp:// Stat timer
+zStat.cpp://
+zStat.cpp://
+zStat.cpp:// Stat sample/inc
+zStat.cpp://
+zStat.cpp://
+zStat.cpp:// Stat mutator allocation rate
+zStat.cpp://
+zStat.cpp://
+zStat.cpp:// Stat thread
+zStat.cpp://
+zStat.cpp://
+zStat.cpp:// Stat table
+zStat.cpp://
+zStat.cpp://
+zStat.cpp:// Stat cycle
+zStat.cpp://
+zStat.cpp://
+zStat.cpp:// Stat workers
+zStat.cpp://
+zStat.cpp://
+zStat.cpp:// Stat load
+zStat.cpp://
+zStat.cpp://
+zStat.cpp:// Stat mark
+zStat.cpp://
+zStat.cpp://
+zStat.cpp:// Stat relocation
+zStat.cpp://
+zStat.cpp://
+zStat.cpp:// Stat nmethods
+zStat.cpp://
+zStat.cpp://
+zStat.cpp:// Stat metaspace
+zStat.cpp://
+zStat.cpp://
+zStat.cpp:// Stat references
+zStat.cpp://
+zStat.cpp://
+zStat.cpp:// Stat heap
+zStat.cpp://
+zStat.hpp://
+zStat.hpp:// Stat unit printers
+zStat.hpp://
+zStat.hpp://
+zStat.hpp:// Stat value
+zStat.hpp://
+zStat.hpp://
+zStat.hpp:// Stat iterable value
+zStat.hpp://
+zStat.hpp://
+zStat.hpp:// Stat sampler
+zStat.hpp://
+zStat.hpp://
+zStat.hpp:// Stat counter
+zStat.hpp://
+zStat.hpp://
+zStat.hpp:// Stat unsampled counter
+zStat.hpp://
+zStat.hpp://
+zStat.hpp:// Stat MMU (Minimum Mutator Utilization)
+zStat.hpp://
+zStat.hpp://
+zStat.hpp:// Stat phases
+zStat.hpp://
+zStat.hpp://
+zStat.hpp:// Stat timer
+zStat.hpp://
+zStat.hpp://
+zStat.hpp:// Stat sample/increment
+zStat.hpp://
+zStat.hpp://
+zStat.hpp:// Stat mutator allocation rate
+zStat.hpp://
+zStat.hpp://
+zStat.hpp:// Stat thread
+zStat.hpp://
+zStat.hpp://
+zStat.hpp:// Stat cycle
+zStat.hpp://
+zStat.hpp://
+zStat.hpp:// Stat workers
+zStat.hpp://
+zStat.hpp://
+zStat.hpp:// Stat load
+zStat.hpp://
+zStat.hpp://
+zStat.hpp:// Stat mark
+zStat.hpp://
+zStat.hpp://
+zStat.hpp:// Stat relocation
+zStat.hpp://
+zStat.hpp://
+zStat.hpp:// Stat nmethods
+zStat.hpp://
+zStat.hpp://
+zStat.hpp:// Stat metaspace
+zStat.hpp://
+zStat.hpp://
+zStat.hpp:// Stat references
+zStat.hpp://
+zStat.hpp://
+zStat.hpp:// Stat heap
+zStat.hpp://
+zTracer.hpp:// For temporary latency measurements during development and debugging
+zUncoloredRoot.hpp:// ZGC has two types of oops:
+zUncoloredRoot.hpp://
+zUncoloredRoot.hpp:// Colored oops (zpointer)
+zUncoloredRoot.hpp://   Metadata explicitly encoded in the pointer bits.
+zUncoloredRoot.hpp://   Requires normal GC barriers to use.
+zUncoloredRoot.hpp://   - OopStorage oops.
+zUncoloredRoot.hpp://
+zUncoloredRoot.hpp:// Uncolored oops (zaddress, zaddress_unsafe)
+zUncoloredRoot.hpp://   Metadata is either implicit or stored elsewhere
+zUncoloredRoot.hpp://   Requires specialized GC barriers
+zUncoloredRoot.hpp://   - nmethod oops - nmethod entry barriers
+zUncoloredRoot.hpp://   - Thread oops - stack watermark barriers
+zUncoloredRoot.hpp://
+zUncoloredRoot.hpp:// Even though the uncolored roots lack the color/metadata, ZGC still needs
+zUncoloredRoot.hpp:// that information when processing the roots. Therefore, we store the color
+zUncoloredRoot.hpp:// in the "container" object where the oop is located, and use specialized
+zUncoloredRoot.hpp:// GC barriers, which accepts the external color as an extra argument. These
+zUncoloredRoot.hpp:// roots are handled in this file.
+zUncoloredRoot.hpp://
+zUncoloredRoot.hpp:// The zaddress_unsafe type is used to hold uncolored oops that the GC needs
+zUncoloredRoot.hpp:// to process before it is safe to use. E.g. the original object might have
+zUncoloredRoot.hpp:// been relocated and the address needs to be updated. The zaddress type
+zUncoloredRoot.hpp:// denotes that this pointer refers the the correct address of the object.
+zValue.hpp://
+zValue.hpp:// Storage
+zValue.hpp://
+zValue.hpp://
+zValue.hpp:// Value
+zValue.hpp://
+zValue.hpp://
+zValue.hpp:// Iterator
+zValue.hpp://
+zValue.inline.hpp://
+zValue.inline.hpp:// Storage
+zValue.inline.hpp://
+zValue.inline.hpp://
+zValue.inline.hpp:// Value
+zValue.inline.hpp://
+zValue.inline.hpp://
+zValue.inline.hpp:// Iterator
+zValue.inline.hpp://

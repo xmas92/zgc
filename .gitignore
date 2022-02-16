@@ -18,3 +18,10 @@ NashornProfile.txt
 /src/utils/LogCompilation/target/
 /.project/
 /.settings/
+dacapo-9.12-MR1-bach.jar
+HelloWorld.class
+HelloWorld.java
+/scratch/
+*.index
+*.threads
+*.hprof
