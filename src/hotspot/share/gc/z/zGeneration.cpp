@@ -61,6 +61,7 @@
 #include "utilities/events.hpp"
 #include "gc/z/zHeapIterator.hpp"
 #include "utilities/hashtable.hpp"
+#include "utilities/growableArray.hpp"
 
 static const ZStatPhaseGeneration ZPhaseGenerationYoung[] {
   ZStatPhaseGeneration("Young: Generation Collection (Minor)", ZGenerationId::young),
@@ -519,17 +520,17 @@ public:
   MyHashEntry** bucket_addr(int i) {
     return (MyHashEntry**)BasicHashtable<mtInternal>::bucket_addr(i);
   }
-  MyHashEntry* new_entry(Klass* klass) {
+  MyHashEntry* new_entry(Klass* klass, unsigned int hash) {
       MyHashEntry* entry = (MyHashEntry*)BasicHashtable<mtInternal>::new_entry(
-        klass->identity_hash()
+        hash
       );
-      entry->init(klass);
+      entry->init(klass, hash);
       return entry;
   }
-  MyHashEntry* add(Klass* klass) {
-    auto entry = get_entry(klass);
+  MyHashEntry* add(Klass* klass, unsigned int hash) {
+    auto entry = get_entry(klass, hash);
     if (entry == NULL) {
-      entry = new_entry(klass);
+      entry = new_entry(klass, hash);
       add(entry);
     }
     return entry;
@@ -540,16 +541,14 @@ public:
       resize(table_size() * 2);
     add_entry(index, entry);
   }
-  MyHashEntry* get_entry(Klass* klass) {
+  MyHashEntry* get_entry(Klass* klass, unsigned int hash) {
     if (number_of_entries() == 0)
       return NULL;
-    Symbol* class_name = klass->name();
-    unsigned int hash = klass->identity_hash();
     auto index = hash_to_index(hash);
     for (MyHashEntry* entry = bucket(index);
                       entry != NULL;
                       entry = entry->next()) {
-      if (entry->hash() == hash && entry->klass()->name() == class_name) {
+      if (entry->is_same(klass, hash)) {
         return entry;
       }
     }
@@ -578,12 +577,18 @@ class FieldHashEntry : public BasicHashtableEntry<MEMFLAGS::mtInternal> {
   public:
     size_t min, max;
     int buckets[8];
+    unsigned int field_offset;
 
-    void init(Klass* klass) {
+    void init(Klass* klass, unsigned int hash) {
       _klass = klass;
+      field_offset = hash;
       min = std::numeric_limits<size_t>::max();
       max = 0;
       for (auto i = 0; i < 8; ++i) buckets[i] = 0;
+    }
+
+    bool is_same(Klass* klass, unsigned int hash) {
+      return hash == field_offset && _klass->name() == klass->name();
     }
 
     void update_bucket(size_t delta) {
@@ -622,17 +627,26 @@ class KlassHashEntry : public BasicHashtableEntry<MEMFLAGS::mtInternal> {
   MyHashtable<FieldHashEntry>* _fields;
   public:
     size_t num_instances;
-    void init(Klass* klass) {
+    size_t max_field_offset;
+    void init(Klass* klass, unsigned int) {
       _klass = klass;
       num_instances = 0;
+      max_field_offset = 0;
       _fields = new(AllocateHeap(sizeof(MyHashtable<FieldHashEntry>), mtInternal))MyHashtable<FieldHashEntry>(8);
     }
 
     Klass* klass() { return _klass; }
     MyHashtable<FieldHashEntry>* fields() { return _fields; }
 
-    FieldHashEntry* add(Klass* klass) {
-      return _fields->add(klass);
+    FieldHashEntry* add(Klass* klass, unsigned int offset) {
+      if (max_field_offset < offset)
+        max_field_offset = offset;
+      return _fields->add(klass, offset);
+    }
+
+
+    bool is_same(Klass* klass, unsigned int hash) {
+      return hash == (unsigned int)klass->identity_hash() && _klass->name() == klass->name();
     }
 
     void deallocate() {
@@ -644,22 +658,126 @@ class KlassHashEntry : public BasicHashtableEntry<MEMFLAGS::mtInternal> {
     }
 };
 
+template<typename E>
+class MyGrowableArray : public GrowableArray<E> {
+  MyGrowableArray() : GrowableArray<E>(2, mtInternal) {};
+public:
+  void* operator new(size_t /* ignored */, void* placement_ptr) throw() { return placement_ptr; }
+  void operator delete(void* ptr) { FreeHeap(ptr); }
+  static MyGrowableArray* newArray() {
+    return new(AllocateHeap(sizeof(MyGrowableArray<E>), mtInternal))MyGrowableArray<E>();
+  }
+};
+
+static GrowableArray<MyGrowableArray<FieldHashEntry*>*>* fieldArray;
+static size_t redunantBytes;
+static size_t compressableBytes;
+
+void log_redunant_bytes(size_t redundant_bytes) {
+  if (redundant_bytes > G) {
+    log_info(gc)(" + Redundant Bytes: %ld B (%ld GB)", redundant_bytes, redundant_bytes / G);
+  } else if (redundant_bytes > M) {
+    log_info(gc)(" + Redundant Bytes: %ld B (%ld MB)", redundant_bytes, redundant_bytes / M);
+  } else if (redundant_bytes > K) {
+    log_info(gc)(" + Redundant Bytes: %ld B (%ld KB)", redundant_bytes, redundant_bytes / K);
+  } else {
+    log_info(gc)(" + Redundant Bytes: %ld B", redundant_bytes);
+  }
+}
+
+void log_compressable_bytes(size_t bytes) {
+  if (bytes > G) {
+    log_info(gc)(" + Compressable Bytes: %ld B (%ld GB)", bytes, bytes / G);
+  } else if (bytes > M) {
+    log_info(gc)(" + Compressable Bytes: %ld B (%ld MB)", bytes, bytes / M);
+  } else if (bytes > K) {
+    log_info(gc)(" + Compressable Bytes: %ld B (%ld KB)", bytes, bytes / K);
+  } else {
+    log_info(gc)(" + Compressable Bytes: %ld B", bytes);
+  }
+}
+
 class MyChecker : public ObjectClosure, public OopFieldClosure, public VM_Operation {
-  public:
     static void visitor_klass_entry(KlassHashEntry* entry) {
       auto klass = entry->klass();
-      if (entry->num_instances > 1000) {
-        log_info(gc)("klass: %s (%ld)", entry->klass()->name()->as_utf8(), entry->num_instances);
-        entry->fields()->visit_all(visitor_field_entry);
+      log_info(gc)("[%s|%s|%s|%s]klass: %s (%ld)",
+        klass->is_instance_klass() ? "I" : "_",
+        klass->is_array_klass() ? "A" : "_",
+        klass->is_objArray_klass() ? "O" : "_",
+        klass->is_typeArray_klass() ? "T" : "_",
+        klass->name()->as_utf8(), entry->num_instances);
+      if (entry->fields()->number_of_entries() == 0)
+        return;
+      auto max_field_locations = entry->max_field_offset / 8 + 1;
+      auto fields = GrowableArray<MyGrowableArray<FieldHashEntry*>*>(
+        max_field_locations, mtInternal);
+      for (size_t i = 0; i < max_field_locations; ++i)
+        fields.append(MyGrowableArray<FieldHashEntry*>::newArray());
+      fieldArray = &fields;
+      size_t compressable_bytes = 0;
+      size_t redundant_bytes = 0;
+      entry->fields()->visit_all(visitor_field_entry);
+      for (auto field_it = fields.begin();
+                field_it != fields.end();
+                ++field_it) {
+        const auto& field = *field_it;
+        if (field->is_empty())
+          continue;
+        bool first = true;
+        size_t largest_butcket_index = 0;
+        size_t num_array_elements = 0;
+        for (auto entry_it = field->begin();
+              entry_it != field->end();
+              ++entry_it) {
+          auto entry = *entry_it;
+          for (auto i = largest_butcket_index + 1; i < 8; ++i) {
+            if (entry->buckets[i] != 0)
+              largest_butcket_index = i;
+          }
+          if (klass->is_array_klass()) {
+            num_array_elements += entry->buckets[0] + entry->buckets[1] +
+                                  entry->buckets[2] + entry->buckets[3] +
+                                  entry->buckets[4] + entry->buckets[5] +
+                                  entry->buckets[6] + entry->buckets[7];
+          }
+          for (auto i = 0; i < 8; ++i) {
+            redundant_bytes += (7 - i) * entry->buckets[i];
+          }
+          if (first) {
+            log_info(gc)(" * field[%03d]: {%-5d,%-5d,%-5d,%-5d,%-5d,%-5d,%-5d,%-5d} %s (%ld, %ld)",
+              entry->field_offset,
+              entry->buckets[0],entry->buckets[1],entry->buckets[2],entry->buckets[3],
+              entry->buckets[4],entry->buckets[5],entry->buckets[6],entry->buckets[7],
+              entry->klass()->name()->as_utf8(), entry->min, entry->max);
+            first = false;
+          } else {
+            log_info(gc)(" *           : {%-5d,%-5d,%-5d,%-5d,%-5d,%-5d,%-5d,%-5d} %s (%ld, %ld)",
+              entry->buckets[0],entry->buckets[1],entry->buckets[2],entry->buckets[3],
+              entry->buckets[4],entry->buckets[5],entry->buckets[6],entry->buckets[7],
+              entry->klass()->name()->as_utf8(), entry->min, entry->max);
+          }
+        }
+        if (klass->is_array_klass()) {
+          compressable_bytes += (7 - largest_butcket_index) * num_array_elements;
+        } else {
+          compressable_bytes += (7 - largest_butcket_index) * entry->num_instances;
+        }
       }
+      log_redunant_bytes(redundant_bytes);
+      log_compressable_bytes(compressable_bytes);
+      redunantBytes += redundant_bytes;
+      compressableBytes += compressable_bytes;
+      for (size_t i = 0; i < max_field_locations; ++i)
+        delete fields.at(i);
+      fieldArray = NULL;
     }
     static void visitor_field_entry(FieldHashEntry* entry) {
-      auto klass = entry->klass();
-      log_info(gc)(" * klass: %s (%ld, %ld) {%d,%d,%d,%d,%d,%d,%d,%d}",
-        entry->klass()->name()->as_utf8(), entry->min, entry->max,
-        entry->buckets[0],entry->buckets[1],entry->buckets[2],entry->buckets[3],
-        entry->buckets[4],entry->buckets[5],entry->buckets[6],entry->buckets[7]);
+      assert(fieldArray != NULL, "fieldsArray should have been created");
+      auto offset = entry->field_offset / 8;
+      assert(offset < (unsigned int)fieldArray->length(), "entry array should have been created");
+      fieldArray->at(offset)->append(entry);
     }
+  public:
 
     void visit_all() {
       _hashtable.visit_all(visitor_klass_entry);
@@ -668,7 +786,9 @@ class MyChecker : public ObjectClosure, public OopFieldClosure, public VM_Operat
 
     MyHashtable<KlassHashEntry> _hashtable;
     void do_object(oop obj) override {
-        //_hashtable.add(obj->klass());
+        auto klass = obj->klass();
+        auto entry = _hashtable.add(klass, klass->identity_hash());
+        ++entry->num_instances;
     }
     oop load_oop(oop base, oop* p) {
       assert(ZCollectedHeap::heap()->is_in(p), "Should be in heap");
@@ -678,13 +798,14 @@ class MyChecker : public ObjectClosure, public OopFieldClosure, public VM_Operat
         if (base == NULL)
           return;
         auto klass = base->klass();
-        if (!klass->is_instance_klass())
+        if (klass->is_typeArray_klass())
           return;
-        auto entry = _hashtable.add(base->klass());
-        ++entry->num_instances;
+        auto entry = _hashtable.get_entry(klass, klass->identity_hash());
+        assert(entry != NULL, "do_object should have added this");
         oop field = load_oop(base, p);
         if (field != NULL) {
-          auto field_entry = entry->add(field->klass());
+          auto field_entry = entry->add(field->klass(),
+            klass->is_objArray_klass() ? 0 : base->field_offset(p));
           if (oopDesc::is_oop(base, true) && oopDesc::is_oop(field, true)) {
             if (base >= field) {
               field_entry->update(pointer_delta((void*)base, (void*)(field), 1));
@@ -751,8 +872,12 @@ void ZGenerationYoung::collect(ZYoungType type, ConcurrentGCTimer* timer) {
   log_info(gc)("ZGenerationYoung::collect start");
   {
     MyChecker oopVisitor;
+    redunantBytes = 0;
+    compressableBytes = 0;
     VMThread::execute(&oopVisitor);
     log_info(gc)("klasses: %d",oopVisitor._hashtable.number_of_entries());
+    log_redunant_bytes(redunantBytes);
+    log_compressable_bytes(compressableBytes);
   }
   log_info(gc)("ZGenerationYoung::collect end");
 }
@@ -1125,6 +1250,18 @@ void ZGenerationOld::collect(ConcurrentGCTimer* timer) {
 
   // Phase 10: Concurrent Relocate
   concurrent_relocate();
+
+  log_info(gc)("ZGenerationOld::collect start");
+  {
+    MyChecker oopVisitor;
+    redunantBytes = 0;
+    compressableBytes = 0;
+    VMThread::execute(&oopVisitor);
+    log_info(gc)("klasses: %d",oopVisitor._hashtable.number_of_entries());
+    log_redunant_bytes(redunantBytes);
+    log_compressable_bytes(compressableBytes);
+  }
+  log_info(gc)("ZGenerationOld::collect end");
 }
 
 void ZGenerationOld::concurrent_mark() {
