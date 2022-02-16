@@ -59,6 +59,8 @@
 #include "runtime/vmThread.hpp"
 #include "utilities/debug.hpp"
 #include "utilities/events.hpp"
+#include "gc/z/zHeapIterator.hpp"
+#include "utilities/hashtable.hpp"
 
 static const ZStatPhaseGeneration ZPhaseGenerationYoung[] {
   ZStatPhaseGeneration("Young: Generation Collection (Minor)", ZGenerationId::young),
@@ -489,6 +491,219 @@ public:
   }
 };
 
+
+
+template<typename MyHashEntry>
+class MyHashtable : public BasicHashtable<mtInternal> {
+public:
+  MyHashtable(int table_size = 1024)
+    : BasicHashtable<mtInternal>(table_size, (sizeof(MyHashEntry))) { }
+
+  void* operator new(size_t /* ignored */, void* placement_ptr) throw() { return placement_ptr; }
+  void operator delete(void* ptr) { FreeHeap(ptr); }
+
+  ~MyHashtable() {
+    MyHashEntry* probe = NULL;
+    for (int index = 0; index < table_size(); index++) {
+      for (MyHashEntry** p = bucket_addr(index); *p != NULL; ) {
+        probe = *p;
+        *p = probe->next();
+        free_entry(probe);
+      }
+    }
+    assert(number_of_entries() == 0, "should have removed all entries");
+  }
+  MyHashEntry* bucket(int i) const {
+    return (MyHashEntry*)BasicHashtable<mtInternal>::bucket(i);
+  }
+  MyHashEntry** bucket_addr(int i) {
+    return (MyHashEntry**)BasicHashtable<mtInternal>::bucket_addr(i);
+  }
+  MyHashEntry* new_entry(Klass* klass) {
+      MyHashEntry* entry = (MyHashEntry*)BasicHashtable<mtInternal>::new_entry(
+        klass->identity_hash()
+      );
+      entry->init(klass);
+      return entry;
+  }
+  MyHashEntry* add(Klass* klass) {
+    auto entry = get_entry(klass);
+    if (entry == NULL) {
+      entry = new_entry(klass);
+      add(entry);
+    }
+    return entry;
+  }
+  void add(MyHashEntry* entry) {
+    int index = hash_to_index(entry->hash());
+    if (number_of_entries() >= table_size())
+      resize(table_size() * 2);
+    add_entry(index, entry);
+  }
+  MyHashEntry* get_entry(Klass* klass) {
+    if (number_of_entries() == 0)
+      return NULL;
+    Symbol* class_name = klass->name();
+    unsigned int hash = klass->identity_hash();
+    auto index = hash_to_index(hash);
+    for (MyHashEntry* entry = bucket(index);
+                      entry != NULL;
+                      entry = entry->next()) {
+      if (entry->hash() == hash && entry->klass()->name() == class_name) {
+        return entry;
+      }
+    }
+    return NULL;
+  }
+
+  void free_entry(MyHashEntry* entry) {
+    entry->deallocate();
+    BasicHashtable<mtInternal>::free_entry(entry);
+  }
+
+
+  void visit_all(void f(MyHashEntry*)) {
+    for (int index = 0; index < table_size(); index++) {
+      for (MyHashEntry* probe = bucket(index);
+                        probe != NULL;
+                        probe = probe->next()) {
+        f(probe);
+      }
+    }
+  }
+};
+
+class FieldHashEntry : public BasicHashtableEntry<MEMFLAGS::mtInternal> {
+  Klass* _klass;
+  public:
+    size_t min, max;
+    int buckets[8];
+
+    void init(Klass* klass) {
+      _klass = klass;
+      min = std::numeric_limits<size_t>::max();
+      max = 0;
+      for (auto i = 0; i < 8; ++i) buckets[i] = 0;
+    }
+
+    void update_bucket(size_t delta) {
+      for (auto i = 0; i < 8; ++i) {
+        delta >>= 8;
+        if (!delta) {
+          buckets[i]++;
+          break;
+        }
+      }
+    }
+
+    void update(size_t delta) {
+      if (delta < min) {
+        min = delta;
+      }
+      if (delta > max) {
+        max = delta;
+      }
+      update_bucket(delta);
+    }
+
+    Klass* klass() { return _klass; }
+
+    void deallocate() {
+
+    }
+
+    FieldHashEntry* next() {
+      return (FieldHashEntry*)BasicHashtableEntry<MEMFLAGS::mtInternal>::next();
+    }
+};
+
+class KlassHashEntry : public BasicHashtableEntry<MEMFLAGS::mtInternal> {
+  Klass* _klass;
+  MyHashtable<FieldHashEntry>* _fields;
+  public:
+    size_t num_instances;
+    void init(Klass* klass) {
+      _klass = klass;
+      num_instances = 0;
+      _fields = new(AllocateHeap(sizeof(MyHashtable<FieldHashEntry>), mtInternal))MyHashtable<FieldHashEntry>(8);
+    }
+
+    Klass* klass() { return _klass; }
+    MyHashtable<FieldHashEntry>* fields() { return _fields; }
+
+    FieldHashEntry* add(Klass* klass) {
+      return _fields->add(klass);
+    }
+
+    void deallocate() {
+      delete _fields;
+    }
+
+    KlassHashEntry* next() {
+      return (KlassHashEntry*)BasicHashtableEntry<MEMFLAGS::mtInternal>::next();
+    }
+};
+
+class MyChecker : public ObjectClosure, public OopFieldClosure, public VM_Operation {
+  public:
+    static void visitor_klass_entry(KlassHashEntry* entry) {
+      auto klass = entry->klass();
+      if (entry->num_instances > 1000) {
+        log_info(gc)("klass: %s (%ld)", entry->klass()->name()->as_utf8(), entry->num_instances);
+        entry->fields()->visit_all(visitor_field_entry);
+      }
+    }
+    static void visitor_field_entry(FieldHashEntry* entry) {
+      auto klass = entry->klass();
+      log_info(gc)(" * klass: %s (%ld, %ld) {%d,%d,%d,%d,%d,%d,%d,%d}",
+        entry->klass()->name()->as_utf8(), entry->min, entry->max,
+        entry->buckets[0],entry->buckets[1],entry->buckets[2],entry->buckets[3],
+        entry->buckets[4],entry->buckets[5],entry->buckets[6],entry->buckets[7]);
+    }
+
+    void visit_all() {
+      _hashtable.visit_all(visitor_klass_entry);
+    }
+
+
+    MyHashtable<KlassHashEntry> _hashtable;
+    void do_object(oop obj) override {
+        //_hashtable.add(obj->klass());
+    }
+    oop load_oop(oop base, oop* p) {
+      assert(ZCollectedHeap::heap()->is_in(p), "Should be in heap");
+      return HeapAccess<AS_NO_KEEPALIVE | ON_UNKNOWN_OOP_REF>::oop_load_at(base, base->field_offset(p));
+    }
+    void do_field(oop base, oop* p) override {
+        if (base == NULL)
+          return;
+        auto klass = base->klass();
+        if (!klass->is_instance_klass())
+          return;
+        auto entry = _hashtable.add(base->klass());
+        ++entry->num_instances;
+        oop field = load_oop(base, p);
+        if (field != NULL) {
+          auto field_entry = entry->add(field->klass());
+          if (oopDesc::is_oop(base, true) && oopDesc::is_oop(field, true)) {
+            if (base >= field) {
+              field_entry->update(pointer_delta((void*)base, (void*)(field), 1));
+            } else {
+              field_entry->update(pointer_delta((void*)field, (void*)(base), 1));
+            }
+          }
+        }
+    }
+    void doit() override {
+      ZHeapIterator iter(1, true);
+      iter.object_and_field_iterate(this,this,0);
+      visit_all();
+    }
+    VMOp_Type type() const override {
+      return VMOp_HeapDumper;
+    }
+};
+
 void ZGenerationYoung::collect(ZYoungType type, ConcurrentGCTimer* timer) {
   ZGenerationCollectionScopeYoung scope(type, timer);
 
@@ -532,6 +747,14 @@ void ZGenerationYoung::collect(ZYoungType type, ConcurrentGCTimer* timer) {
 
   // Phase 8: Concurrent Relocate
   concurrent_relocate();
+
+  log_info(gc)("ZGenerationYoung::collect start");
+  {
+    MyChecker oopVisitor;
+    VMThread::execute(&oopVisitor);
+    log_info(gc)("klasses: %d",oopVisitor._hashtable.number_of_entries());
+  }
+  log_info(gc)("ZGenerationYoung::collect end");
 }
 
 class VM_ZMarkStartYoungAndOld : public VM_ZOperation {
