@@ -619,7 +619,7 @@ inline bool ZBarrier::clean_barrier_on_final_oop_field(volatile zpointer* p) {
 //
 // Mark barrier
 //
-inline void ZBarrier::mark_barrier_on_oop_field(volatile zpointer* p, bool finalizable) {
+inline zaddress ZBarrier::mark_barrier_on_oop_field(volatile zpointer* p, bool finalizable) {
   const zpointer o = load_atomic(p);
 
   if (finalizable) {
@@ -648,18 +648,18 @@ inline void ZBarrier::mark_barrier_on_oop_field(volatile zpointer* p, bool final
 
     // Note: that this does not color the pointer finalizable marked if it
     // is already colored marked old good.
-    barrier(is_finalizable_good_fast_path, mark_finalizable_slow_path, color_finalizable_good, p, o);
+    return barrier(is_finalizable_good_fast_path, mark_finalizable_slow_path, color_finalizable_good, p, o);
   } else {
-    barrier(is_mark_good_fast_path, mark_slow_path, color_mark_good, p, o);
+    return barrier(is_mark_good_fast_path, mark_slow_path, color_mark_good, p, o);
   }
 }
 
-inline void ZBarrier::mark_barrier_on_young_oop_field(volatile zpointer* p) {
+inline zaddress ZBarrier::mark_barrier_on_young_oop_field(volatile zpointer* p) {
   const zpointer o = load_atomic(p);
-  barrier(is_store_good_or_null_any_fast_path, mark_slow_path, color_store_good, p, o);
+  return barrier(is_store_good_or_null_any_fast_path, mark_slow_path, color_store_good, p, o);
 }
 
-inline void ZBarrier::promote_barrier_on_young_oop_field(volatile zpointer* p) {
+inline zaddress ZBarrier::promote_barrier_on_young_oop_field(volatile zpointer* p) {
   const zpointer o = load_atomic(p);
   // Objects that get promoted to the old generation, must invariantly contain
   // only store good pointers. However, the young marking code above filters
@@ -669,7 +669,7 @@ inline void ZBarrier::promote_barrier_on_young_oop_field(volatile zpointer* p) {
   // This could simply be ensured in the marking above, but promotion rates
   // are typically rather low, and fixing all null pointers strictly, when
   // only a few had to be store good due to promotions, is generally not favourable
-  barrier(is_store_good_fast_path, promote_slow_path, color_store_good, p, o);
+  return barrier(is_store_good_fast_path, promote_slow_path, color_store_good, p, o);
 }
 
 //
