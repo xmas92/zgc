@@ -592,6 +592,9 @@ class FieldHashEntry : public BasicHashtableEntry<MEMFLAGS::mtInternal> {
     }
 
     void update_bucket(size_t delta) {
+      assert(delta < std::numeric_limits<size_t>::max() >> 1, "delta is to large");
+      // account for delta direction
+      delta <<= 1;
       for (auto i = 0; i < 8; ++i) {
         delta >>= 8;
         if (!delta) {
@@ -801,7 +804,11 @@ class MyChecker : public ObjectClosure, public OopFieldClosure, public VM_Operat
         if (klass->is_typeArray_klass())
           return;
         auto entry = _hashtable.get_entry(klass, klass->identity_hash());
-        assert(entry != NULL, "do_object should have added this");
+        if (entry == NULL) {
+          // For some reason do_object did not run on base.
+          entry = _hashtable.add(klass, klass->identity_hash());
+          ++entry->num_instances;
+        }
         oop field = load_oop(base, p);
         if (field != NULL) {
           auto field_entry = entry->add(field->klass(),
