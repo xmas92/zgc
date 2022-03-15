@@ -80,6 +80,7 @@
 #include "utilities/macros.hpp"
 #include "utilities/ostream.hpp"
 #include "utilities/preserveException.hpp"
+#include "gc/z/exCompressedStatsTable.hpp"
 
 // Known objects
 Klass* Universe::_typeArrayKlassObjs[T_LONG+1]        = { NULL /*, NULL...*/ };
@@ -751,6 +752,11 @@ jint universe_init() {
   // Checks 'AfterMemoryInit' constraints.
   if (!JVMFlagLimit::check_all_constraints(JVMFlagConstraintPhase::AfterMemoryInit)) {
     return JNI_EINVAL;
+  }
+
+  // TODO: Init CompressedTable
+  if (UseZGC && ExUseDynamicCompressedOops) {
+    ExCompressedStatsTable::create_table();
   }
 
   // Create memory for metadata.  Must be after initializing heap for

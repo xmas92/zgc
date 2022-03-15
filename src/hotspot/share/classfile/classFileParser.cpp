@@ -5291,6 +5291,32 @@ void ClassFileParser::fill_instance_klass(InstanceKlass* ik,
   assert(_fac != NULL, "invariant");
   ik->set_static_oop_field_count(_fac->count[STATIC_OOP]);
 
+
+  // TODO: Maybe move this up in the fill order.
+  if (UseZGC && ExUseDynamicCompressedOops) {
+
+    LogTarget(Info, gc, coops) lt;
+    if (lt.is_enabled) {
+      ResourceMark rm;
+      lt.print("[Compression Gains for %s]: (%ld,%ld) over %hd fields", ik->external_name(),
+        _compression_gains->get_min_comperssion(), _compression_gains->get_max_comperssion(),
+        _compression_gains->get_num_reference_fields());
+    }
+    // TODO: use setter instead, decouple this class for the field name.
+    if (ExCompressionHeuristics::consider_compression(_compression_gains)) {
+      ik->_compressed_stats_data_entry = ExCompressedStatsTable::new_entry(ik);
+      if (lt.is_enabled) {
+        ResourceMark rm;
+        lt.print("[ExCompressionHeuristics selected %s]", ik->external_name());
+      }
+    } else {
+      delete _compression_gains;
+      _compression_gains = NULL;
+    }
+    ik->set_compression_gains(_compression_gains);
+    _compression_gains = NULL;
+  }
+
   // this transfers ownership of a lot of arrays from
   // the parser onto the InstanceKlass*
   apply_parsed_class_metadata(ik, _java_fields_count);
@@ -6035,7 +6061,11 @@ void ClassFileParser::post_process_parsed_stream(const ClassFileStream* const st
   FieldLayoutBuilder lb(class_name(), super_klass(), _cp, _fields,
                         _parsed_annotations->is_contended(), _field_info);
   lb.build_layout();
-
+  if (UseZGC && ExUseDynamicCompressedOops) {
+    ResourceMark rm;
+    _compression_gains = new ExCompressionGains();
+    lb.calculate_compression_gains(_compression_gains, Universe::heap()->max_capacity());
+  }
   // Compute reference typ
   _rt = (NULL ==_super_klass) ? REF_NONE : _super_klass->reference_type();
 

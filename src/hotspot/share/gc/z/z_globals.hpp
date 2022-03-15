@@ -60,6 +60,9 @@
   product(bool, ZBufferStoreBarriers, true,                                 \
           "Buffer store barriers")                                          \
                                                                             \
+  product(bool, ExUseDynamicCompressedOops, false,                          \
+          "Use exjobb compressed oops")                                     \
+                                                                            \
   product(uintx, ZUncommitDelay, 5 * 60,                                    \
           "Uncommit memory if it has been unused for the specified "        \
           "amount of time (in seconds)")                                    \

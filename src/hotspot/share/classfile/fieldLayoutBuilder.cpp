@@ -704,3 +704,215 @@ void FieldLayoutBuilder::epilogue() {
 void FieldLayoutBuilder::build_layout() {
   compute_regular_layout();
 }
+
+void FieldLayoutBuilder::calculate_compression_gains(ExCompressionGains* compression_gains, size_t max_heap_size) {
+  _layout->calculate_compression_gains(compression_gains, max_heap_size, _is_contended);
+}
+
+void FieldLayout::calculate_compression_gains(ExCompressionGains* compression_gains, size_t max_heap_size, bool is_contended) {
+  ResourceMark rm;
+  assert(compression_gains != NULL, "sanity");
+  assert(max_heap_size > 0, "sanity");
+  int max_heap_size_bytes;
+  if (log2i(max_heap_size) + ExDynamicCompressedOopsMetaDataBits + 2 >= sizeof(size_t) * BitsPerByte) {
+    max_heap_size = std::numeric_limits<size_t>::max();
+    max_heap_size_bytes = sizeof(size_t);
+  } else {
+    max_heap_size <<= (ExDynamicCompressedOopsMetaDataBits + 1);
+    int max_heap_size_bits = log2i(max_heap_size) + 1;
+    if (max_heap_size_bits == 0) {
+      max_heap_size_bytes = 1;
+    } else {
+      max_heap_size_bytes = (max_heap_size_bits + BitsPerByte - 1) / BitsPerByte;
+    }
+  }
+  LayoutRawBlock* last_super = NULL;
+  LayoutRawBlock* b = _blocks;
+  GrowableArray<LayoutRawBlock*> empty_blocks;
+  GrowableArray<LayoutRawBlock*> reference_blocks;
+  while(b != _last) {
+    switch(b->kind()) {
+      case LayoutRawBlock::INHERITED:
+        last_super = b;
+        break;
+      case LayoutRawBlock::FLATTENED:
+        // TODO: Check what FLATTENED field actually means.
+      case LayoutRawBlock::REGULAR:
+          if (b->is_reference()) {
+            reference_blocks.push(b);
+          }
+      case LayoutRawBlock::EMPTY:
+            empty_blocks.push(b);
+        break;
+      case LayoutRawBlock::RESERVED:
+      case LayoutRawBlock::PADDING:
+        break;
+    }
+    b = b->next_block();
+  }
+  compression_gains->set_num_reference_fields(reference_blocks.length());
+  compression_gains->set_uncompressed_size(align_up(_last->offset(), MinObjAlignmentInBytes));
+  if (reference_blocks.length() == 0) {
+    compression_gains->set_compression(0,0);
+    return;
+  }
+  if (last_super == NULL) {
+    assert(_blocks->kind() == LayoutRawBlock::RESERVED, "should be header, no inherited fields");
+    last_super = _blocks;
+  }
+  if (is_contended) {
+    // When is_contended we can shrink reference field blocks and adjacent empty blocks
+    // But no reordering so must respect alignment.
+    assert(reference_blocks.length() == 0 || reference_blocks.first()->offset() > last_super->offset(), "sanity");
+    size_t min_compression = 0;
+    size_t max_compression = 0;
+    for (int i = 0, j = 0; i < reference_blocks.length(); ++i) {
+      LayoutRawBlock* reference_block = reference_blocks.at(i);
+      LayoutRawBlock* empty_block = NULL;
+      while (j < empty_blocks.length()) {
+        empty_block = empty_blocks.at(j);
+        if (empty_block->offset() > reference_block->offset()) {
+          empty_block = NULL;
+          break;
+        } else if (empty_block->offset() + empty_block->size() == reference_block->offset()) {
+          if (!UseEmptySlotsInSupers && !is_aligned(last_super->offset() + last_super->size(), MinObjAlignmentInBytes)) {
+            // Special case when previous empty field is in super class and we are not allowed to use its slots.
+            // Might be allowed when super !has_fields. But dissallow for now.
+            empty_block = NULL;
+          }
+          ++j;
+          break;
+        }
+        empty_block = NULL;
+        ++j;
+      }
+      u2 num_references = 1;
+      int start_offset = reference_block->offset();
+      int end_offset = start_offset + reference_block->size();
+      if (empty_block != NULL) {
+        start_offset = empty_block->offset();
+      }
+      LayoutRawBlock* next = reference_block->next_block();
+      while (next != _last) {
+        if (next->kind() != LayoutRawBlock::EMPTY)
+          break;
+        assert(j < empty_blocks.length() && empty_blocks.at(j) == next, "invariant");
+        assert(end_offset == next->offset(), "sanity");
+        ++j;
+        end_offset += next->size();
+        next = next->next_block();
+        if (next == _last || !next->is_reference())
+          break;
+        ++i;
+        ++num_references;
+        assert(i < reference_blocks.length() && reference_blocks.at(i) == next, "invariant");
+        assert(end_offset == next->offset(), "sanity");
+        end_offset += next->size();
+        next = next->next_block();
+      }
+      int max_alignment = 0;
+      while (next != _last) {
+        if (next->is_reference())
+          continue;
+        int next_alignment = next->alignment();
+        next = next->next_block();
+      };
+      assert(end_offset > start_offset, "sanity");
+      int block_size = end_offset - start_offset;
+      assert((block_size - num_references * max_heap_size_bytes) >= 0, "sanity");
+      min_compression += ((block_size - num_references * max_heap_size_bytes) / max_alignment) * max_alignment;
+      max_compression += ((block_size - num_references) / max_alignment) * max_alignment;
+    }
+    min_compression = align_down(min_compression, MinObjAlignmentInBytes);
+    max_compression = align_down(max_compression, MinObjAlignmentInBytes);
+    compression_gains->set_compression(min_compression, max_compression);
+    return;
+  }
+
+  // First pack as many references in the super as posible
+  u2 min_packed = 0;
+  u2 max_packed = 0;
+  int i = 0, j = 0;
+  int super_end = align_up(last_super->offset() + last_super->size(), MinObjAlignmentInBytes);
+  if (UseEmptySlotsInSupers) {
+    for (; i < reference_blocks.length(); ++i) {
+      LayoutRawBlock* reference_block = reference_blocks.at(i);
+      LayoutRawBlock* empty_block = NULL;
+      while (j < empty_blocks.length()) {
+        empty_block = empty_blocks.at(j);
+        if (empty_block->offset() >= super_end) {
+          break;
+        } else if (empty_block->offset() > reference_block->offset()) {
+          empty_block = NULL;
+          break;
+        } else if (empty_block->offset() + empty_block->size() == reference_block->offset() &&
+                   empty_block != last_super->next_block()) {
+          ++j;
+          break;
+        } else if (empty_block->offset() < super_end) {
+          int empty_block_size = empty_block->size();
+          assert(empty_block_size > 0, "sanity");
+          max_packed += empty_block_size;
+          min_packed += empty_block_size / max_heap_size_bytes;
+        }
+        empty_block = NULL;
+        ++j;
+      }
+      if (reference_block->offset() >= super_end) {
+        break;
+      }
+
+      int start_offset = reference_block->offset();
+      int end_offset = start_offset + reference_block->size();
+      if (empty_block != NULL) {
+        start_offset = empty_block->offset();
+      }
+      LayoutRawBlock* next = reference_block->next_block();
+      while (next != _last && next->offset() < super_end) {
+        if (next->kind() != LayoutRawBlock::EMPTY)
+          break;
+        assert(j < empty_blocks.length() && empty_blocks.at(j) == next, "invariant");
+        assert(end_offset == next->offset(), "sanity");
+        ++j;
+        end_offset += next->size();
+        next = next->next_block();
+        if (next == _last || !next->is_reference() || next->offset() >= super_end)
+          break;
+        ++i;
+        assert(i < reference_blocks.length() && reference_blocks.at(i) == next, "invariant");
+        assert(end_offset == next->offset(), "sanity");
+        end_offset += next->size();
+        next = next->next_block();
+      }
+      assert(end_offset > start_offset, "sanity");
+      int block_size = end_offset - start_offset;
+      max_packed += block_size;
+      min_packed += block_size / max_heap_size_bytes;
+      if (next == _last || next->offset() >= super_end) {
+        break;
+      }
+    }
+    assert(i == 0 || reference_blocks.at(i-1)->offset() < super_end, "sanity");
+    assert(i >= reference_blocks.length() || reference_blocks.at(i)->offset() >= super_end, "sanity");
+
+    assert(j == 0 || empty_blocks.at(j-1)->offset() < super_end, "sanity");
+    assert(j >= empty_blocks.length() || empty_blocks.at(j)->offset() >= super_end, "sanity");
+  }
+  size_t min_compression = 0;
+  size_t max_compression = 0;
+  assert(max_packed >= min_packed, "sanity");
+  // Assume fully packed
+  max_compression = reference_blocks.length() * heapOopSize;
+  min_compression = reference_blocks.length() * heapOopSize;
+  // Fill values not packed in super
+  if (max_packed < reference_blocks.length()) {
+    max_compression -= reference_blocks.length() - max_packed;
+  }
+  if (min_packed < reference_blocks.length()) {
+    min_compression -= (reference_blocks.length() - min_packed) * max_heap_size_bytes;
+  }
+  // Align
+  min_compression = align_down(min_compression, MinObjAlignmentInBytes);
+  max_compression = align_down(max_compression, MinObjAlignmentInBytes);
+  compression_gains->set_compression(min_compression, max_compression);
+}

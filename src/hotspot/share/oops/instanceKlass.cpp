@@ -496,7 +496,8 @@ InstanceKlass::InstanceKlass(const ClassFileParser& parser, unsigned kind, Klass
   _nest_host_index(0),
   _init_state(allocated),
   _reference_type(parser.reference_type()),
-  _init_thread(NULL)
+  _init_thread(NULL),
+  _compressed_stats_data_entry(NULL)
 {
   set_vtable_length(parser.vtable_size());
   set_kind(kind);
@@ -2662,6 +2663,10 @@ void InstanceKlass::unload_class(InstanceKlass* ik) {
     ResourceMark rm;
     log_info(class, unload)("unloading class %s " INTPTR_FORMAT, ik->external_name(), p2i(ik));
   }
+  // TODO: Remove CompressedStatData Entry
+  if (UseZGC && ExUseDynamicCompressedOops) {
+    ik->ex_compression_cleanup();
+  }
 
   Events::log_class_unloading(Thread::current(), ik);
 
@@ -4191,3 +4196,53 @@ void ClassHierarchyIterator::next() {
   _current = _current->next_sibling();
   return; // visit next sibling subclass
 }
+
+/*
+
+Pair<size_t, size_t> InstanceKlass::ex_compressed_oops_get_possible_compression() {
+  InstanceKlass* super = superklass();
+  size_t super_usable_padding = 0;
+  if (super != NULL) {
+    // Find super last field
+    auto super_size = super->layout_helper_size_in_bytes(super->layout_helper());
+    int length = super->java_fields_count();
+    if (length == 0 && super->subklass() == NULL) {
+      // No java fields and
+      super->header_size();
+    } else {
+      int largest_offset = 0;
+      for (int i = 0; i < length; ++i) {
+        int offset = super->field_offset(i);
+        if (offset > largest_offset) {
+          largest_offset = offset;
+        }
+      }
+
+    }
+  }
+  ResourceMark rm;
+  fieldDescriptor fd;
+  // In DebugInfo nonstatic fields are sorted by offset.
+  GrowableArray<Pair<int,int> > fields_sorted;
+  int i = 0;
+  for (AllFieldStream fs(this); !fs.done(); fs.next()) {
+    if (!fs.access_flags().is_static()) {
+      fd = fs.field_descriptor();
+      Pair<int,int> f(fs.offset(), fs.index());
+      fields_sorted.push(f);
+      i++;
+    }
+  }
+  if (i > 0) {
+    int length = i;
+    assert(length == fields_sorted.length(), "duh");
+    // _sort_Fn is defined in growableArray.hpp.
+    fields_sorted.sort(compare_fields_by_offset);
+    for (int i = 0; i < length; i++) {
+      fd.reinitialize(this, fields_sorted.at(i).second);
+      assert(!fd.is_static() && fd.offset() == fields_sorted.at(i).first, "only nonstatic fields");
+      cl->do_field(&fd);
+    }
+  }
+}
+*/

@@ -198,6 +198,9 @@ class ClassFileParser {
   bool _has_vanilla_constructor;
   int _max_bootstrap_specifier_index;  // detects BSS values
 
+  // ExDynamicCompressedOops
+  ExCompressionGains* _compression_gains;
+
   void parse_stream(const ClassFileStream* const stream, TRAPS);
 
   void mangle_hidden_class_name(InstanceKlass* const ik);

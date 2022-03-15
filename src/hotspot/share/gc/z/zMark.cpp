@@ -306,7 +306,7 @@ public:
       zaddr = ZBarrier::mark_barrier_on_oop_field((zpointer*)p, finalizable);
     }
     oop field = to_oop(zaddr);
-    if (field != NULL && _obj != NULL) {
+    if (false && field != NULL && _obj != NULL) {
       size_t delta;
       if (oopDesc::compare(_obj, field) < 0) {
         delta = pointer_delta((void*)field, (void*)_obj, 1);

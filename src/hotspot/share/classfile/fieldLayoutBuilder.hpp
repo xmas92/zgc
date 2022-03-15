@@ -30,6 +30,7 @@
 #include "memory/allocation.hpp"
 #include "oops/fieldStreams.hpp"
 #include "utilities/growableArray.hpp"
+#include "gc/shared/gc_globals.hpp"
 
 // Classes below are used to compute the field layout of classes.
 
@@ -197,6 +198,7 @@ class FieldLayout : public ResourceObj {
   LayoutRawBlock* insert(LayoutRawBlock* slot, LayoutRawBlock* block);
   void remove(LayoutRawBlock* block);
   void print(outputStream* output, bool is_static, const InstanceKlass* super);
+  void calculate_compression_gains(ExCompressionGains* compression_gains, size_t max_heap_size, bool is_contended);
 };
 
 
@@ -254,6 +256,7 @@ class FieldLayoutBuilder : public ResourceObj {
   void build_layout();
   void compute_regular_layout();
   void insert_contended_padding(LayoutRawBlock* slot);
+  void calculate_compression_gains(ExCompressionGains* compression_gains, size_t max_heap_size = MaxHeapSize);
 
  private:
   void prologue();

@@ -34,6 +34,7 @@
 #include "utilities/accessFlags.hpp"
 #include "utilities/align.hpp"
 #include "utilities/macros.hpp"
+#include "gc/z/exCompressedStatsTable.hpp"
 #if INCLUDE_JFR
 #include "jfr/support/jfrKlassExtension.hpp"
 #endif
@@ -311,6 +312,10 @@ class InstanceKlass: public Klass {
   //     [generic signature index]
   //     ...
   Array<u2>*      _fields;
+
+  // ExDynamicCompressedOops
+  ExCompressedStatsData* _compressed_stats_data_entry;
+  ExCompressionGains*              _compression_gains;
 
   // embedded Java vtable follows here
   // embedded Java itables follows here
@@ -1266,6 +1271,29 @@ public:
   void print_class_load_logging(ClassLoaderData* loader_data,
                                 const ModuleEntry* module_entry,
                                 const ClassFileStream* cfs) const;
+
+  // ExDynamicCompressedOoops
+  ExCompressionGains* compression_gains() const            { return _compression_gains; }
+  void set_compression_gains(ExCompressionGains* compression_gains) {
+    guarantee(_compression_gains == NULL || compression_gains == NULL, "Just checking");
+    // TODO: Assert size is number of oops fields + 1
+    _compression_gains = compression_gains;
+  }
+  ExCompressedStatsData* compressed_stats_data_entry() const            { return _compressed_stats_data_entry; }
+  void set_compressed_stats_data_entry(ExCompressedStatsData* compressed_stats_data_entry) {
+    guarantee(_compressed_stats_data_entry == NULL || compressed_stats_data_entry == NULL, "Just checking");
+    _compressed_stats_data_entry = compressed_stats_data_entry;
+  }
+  void ex_compression_cleanup() {
+    if (_compressed_stats_data_entry != NULL) {
+      ExCompressedStatsTable::unload_klass(this);
+      assert(_compression_gains != NULL, "invariant, might not hold on oom?");
+      delete _compression_gains;
+      _compression_gains = NULL;
+    } else {
+      assert(_compression_gains == NULL, "invariant");
+    }
+  }
 };
 
 // for adding methods
