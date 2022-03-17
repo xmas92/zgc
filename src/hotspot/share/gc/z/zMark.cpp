@@ -285,40 +285,17 @@ private:
   }
 
   const bool _visit_metadata;
-  oop _obj;
 public:
   ZMarkBarrierOldOopClosure() :
       ClaimMetadataVisitingOopIterateClosure(claim_value(),
                                              discoverer()),
-      _visit_metadata(visit_metadata()),
-      _obj(NULL) {}
-  ZMarkBarrierOldOopClosure(oop o) :
-      ClaimMetadataVisitingOopIterateClosure(claim_value(),
-                                             discoverer()),
-      _visit_metadata(visit_metadata()),
-      _obj(o) {}
+      _visit_metadata(visit_metadata()){}
 
   virtual void do_oop(oop* p) {
-    zaddress zaddr;
     if (young) {
-      zaddr = ZBarrier::mark_barrier_on_young_oop_field((zpointer*)p);
+      ZBarrier::mark_barrier_on_young_oop_field((zpointer*)p);
     } else {
-      zaddr = ZBarrier::mark_barrier_on_oop_field((zpointer*)p, finalizable);
-    }
-    oop field = to_oop(zaddr);
-    if (false && field != NULL && _obj != NULL) {
-      size_t delta;
-      if (oopDesc::compare(_obj, field) < 0) {
-        delta = pointer_delta((void*)field, (void*)_obj, 1);
-      } else {
-        delta = pointer_delta((void*)_obj, (void*)field, 1);
-      }
-      ResourceMark resourceMark;
-      log_info(gc)("[%ld] %s -> %s [%ld]",
-        _obj->field_offset(p),
-        _obj->klass()->name()->as_utf8(),
-        field->klass()->name()->as_utf8(),
-        delta);
+      ZBarrier::mark_barrier_on_oop_field((zpointer*)p, finalizable);
     }
   }
 
@@ -335,10 +312,10 @@ public:
 void ZMark::follow_array_object(objArrayOop obj, bool finalizable) {
   if (_generation->is_old()) {
     if (finalizable) {
-      ZMarkBarrierOldOopClosure<true /* finalizable */, false /* young */> cl((oop)obj);
+      ZMarkBarrierOldOopClosure<true /* finalizable */, false /* young */> cl;
       cl.do_klass(obj->klass());
     } else {
-      ZMarkBarrierOldOopClosure<false /* finalizable */, false /* young */> cl((oop)obj);
+      ZMarkBarrierOldOopClosure<false /* finalizable */, false /* young */> cl;
       cl.do_klass(obj->klass());
     }
   }
@@ -356,10 +333,10 @@ void ZMark::follow_object(oop obj, bool finalizable) {
   if (_generation->is_old()) {
     if (ZHeap::heap()->is_old(to_zaddress(obj))) {
       if (finalizable) {
-        ZMarkBarrierOldOopClosure<true /* finalizable */, false /* young */> cl(obj);
+        ZMarkBarrierOldOopClosure<true /* finalizable */, false /* young */> cl;
         ZIterator::oop_iterate(obj, &cl);
       } else {
-        ZMarkBarrierOldOopClosure<false /* finalizable */, false /* young */> cl(obj);
+        ZMarkBarrierOldOopClosure<false /* finalizable */, false /* young */> cl;
         ZIterator::oop_iterate(obj, &cl);
       }
     } else {
@@ -367,7 +344,7 @@ void ZMark::follow_object(oop obj, bool finalizable) {
     }
   } else {
     // Young gen must help out with old marking
-    ZMarkBarrierOldOopClosure<false /* finalizable */, true /* young */> cl(obj);
+    ZMarkBarrierOldOopClosure<false /* finalizable */, true /* young */> cl;
     ZIterator::oop_iterate(obj, &cl);
   }
 }

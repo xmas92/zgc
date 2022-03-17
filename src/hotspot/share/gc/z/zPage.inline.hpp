@@ -303,7 +303,12 @@ inline bool ZPage::is_object_marked(zaddress addr, bool finalizable) const {
 inline bool ZPage::mark_object(zaddress addr, bool finalizable, bool& inc_live) {
   assert(is_relocatable(), "Invalid page state");
   assert(is_in(addr), "Invalid address");
-  (void)to_oop(addr);
+  oop obj = to_oop(addr);
+  if (ExUseDynamicCompressedOops)  {
+    if (obj != NULL && obj->is_instance()) {
+      InstanceKlass::cast(obj->klass())->ex_handle_object(_generation_id, _seqnum, obj);
+    }
+  }
 
   // Set mark bit
   const size_t index = bit_index(addr);

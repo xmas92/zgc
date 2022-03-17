@@ -83,6 +83,7 @@
 #include "utilities/ostream.hpp"
 #include "utilities/resourceHash.hpp"
 #include "utilities/utf8.hpp"
+#include "gc/z/exCompressedStatsTable.inline.hpp"
 
 #if INCLUDE_CDS
 #include "classfile/systemDictionaryShared.hpp"
@@ -5291,32 +5292,6 @@ void ClassFileParser::fill_instance_klass(InstanceKlass* ik,
   assert(_fac != NULL, "invariant");
   ik->set_static_oop_field_count(_fac->count[STATIC_OOP]);
 
-
-  // TODO: Maybe move this up in the fill order.
-  if (UseZGC && ExUseDynamicCompressedOops) {
-
-    LogTarget(Info, gc, coops) lt;
-    if (lt.is_enabled) {
-      ResourceMark rm;
-      lt.print("[Compression Gains for %s]: (%ld,%ld) over %hd fields", ik->external_name(),
-        _compression_gains->get_min_comperssion(), _compression_gains->get_max_comperssion(),
-        _compression_gains->get_num_reference_fields());
-    }
-    // TODO: use setter instead, decouple this class for the field name.
-    if (ExCompressionHeuristics::consider_compression(_compression_gains)) {
-      ik->_compressed_stats_data_entry = ExCompressedStatsTable::new_entry(ik);
-      if (lt.is_enabled) {
-        ResourceMark rm;
-        lt.print("[ExCompressionHeuristics selected %s]", ik->external_name());
-      }
-    } else {
-      delete _compression_gains;
-      _compression_gains = NULL;
-    }
-    ik->set_compression_gains(_compression_gains);
-    _compression_gains = NULL;
-  }
-
   // this transfers ownership of a lot of arrays from
   // the parser onto the InstanceKlass*
   apply_parsed_class_metadata(ik, _java_fields_count);
@@ -5505,6 +5480,12 @@ void ClassFileParser::fill_instance_klass(InstanceKlass* ik,
         }
       }
     }
+  }
+
+  // TODO: Maybe move this up in the fill order.
+  // Requires almost compleatly filled InstanceKlass.
+  if (UseZGC && ExUseDynamicCompressedOops) {
+    ExCompressionHeuristics::handle_loaded_instance_class(ik, _compression_gains);
   }
 
   JFR_ONLY(INIT_ID(ik);)

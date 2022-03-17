@@ -5,7 +5,9 @@
 #define SHARE_GC_Z_EXCOMPRESSEDSTATSTABLE_HPP
 
 #include "memory/allocation.hpp"
-#include "oops/klass.hpp"
+#include "gc/z/zGenerationId.hpp"
+#include "oops/instanceKlass.hpp"
+
 
 auto const MEMFLAGS_VALUE = mtInternal;
 class ExCompressedStatsData;
@@ -22,19 +24,62 @@ public:
     static ExCompressedStatsData* new_entry(Klass* klass);
 
     static void unload_klass(Klass* klass);
+
+    static void evaluate_table(ZGenerationId id, uint32_t seqnum);
+};
+
+class ExCompressedFieldStatsData : public CHeapObj<MEMFLAGS_VALUE> {
+    volatile size_t _min, _max, _num_null;
+    volatile size_t _distribution[sizeof(size_t)];
+public:
+    ExCompressedFieldStatsData();
+
+    size_t get_max() { return _max; }
+    size_t get_min() { return _min; }
+    size_t get_num_null() { return _num_null; }
+    volatile size_t* get_distribution() { return _distribution; }
+
+    void ex_handle_field(oop obj, oop field);
+    void reset_data();
 };
 
 class ExCompressedStatsData : public CHeapObj<MEMFLAGS_VALUE> {
-    Klass* _klass;
-    size_t _min[2], _max[2];
-    size_t _num_instances[2];
-    size_t _distribution[HeapWordSize][2];
+public:
+enum CompressionStatus {
+    CompressEvaluate,
+    CompressNever,
+    CompressLikely,
+    CompressPending,
+    CompressComplete,
+    // Remove from compression table after marking
+    CompressAbort,
+};
 
+private:
+    Klass* _klass;
+    volatile size_t _num_instances[2];
+    volatile CompressionStatus _status[2];
+    volatile uint64_t _seqnum[2];
+    GrowableArrayCHeap<ExCompressedFieldStatsData, MEMFLAGS_VALUE> _field_data[2];
 public:
     ExCompressedStatsData(Klass* klass);
     ~ExCompressedStatsData();
 
     Klass* klass() const { return _klass; }
+
+    void ex_handle_object(ZGenerationId id, uint32_t seqnum, oop obj);
+    void ex_handle_object_instanceklass(ZGenerationId id, uint32_t seqnum, oop obj, InstanceKlass* ik);
+
+    void evaluate(ZGenerationId id, uint32_t seqnum);
+
+    void initial_compression_status(CompressionStatus status) {
+        _status[0] = _status[1] = status;
+    }
+
+private:
+    void ex_handle_object_common(ZGenerationId id, oop obj, InstanceKlass* ik);
+    void ex_handle_seqnum(ZGenerationId id, uint32_t seqnum);
+    void reset_data(ZGenerationId id);
 };
 
 class ExCompressionGains : public CHeapObj<MEMFLAGS_VALUE> {
@@ -70,16 +115,12 @@ public:
 
 class ExCompressionHeuristics : StackObj {
     friend class ExCompressionGains;
+private:
+    static inline ExCompressedStatsData::CompressionStatus log_rejected(InstanceKlass* ik, const char* reason);
+    static inline  ExCompressedStatsData::CompressionStatus log_selected(ExCompressedStatsData::CompressionStatus status, InstanceKlass* ik, const char* reason);
+    static inline  ExCompressedStatsData::CompressionStatus should_consider_compression_of_loaded_instance_klass(InstanceKlass* ik, ExCompressionGains* compression_gains);
 public:
-    static inline bool consider_compression(ExCompressionGains* compression_gains) {
-        assert(compression_gains->get_min_comperssion() <= compression_gains->get_max_comperssion(), "sanity");
-        if (compression_gains->get_num_reference_fields() == 0 || compression_gains->get_max_comperssion() == 0) {
-            assert(compression_gains->get_min_comperssion() == 0 &&
-                    compression_gains->get_max_comperssion() == 0, "sanity");
-            return false;
-        }
-        return true;
-    }
+    static inline void handle_loaded_instance_class(InstanceKlass* ik, ExCompressionGains*& compression_gains);
 };
 
 

@@ -755,6 +755,7 @@ bool ZGenerationYoung::mark_end() {
 
   // Update statistics
   stat_heap()->at_mark_end(_page_allocator->stats(this));
+  ExCompressedStatsTable::evaluate_table(_id, _seqnum);
 
   // Notify JVMTI that some tagmap entry objects may have died.
   JvmtiTagMap::set_needs_cleaning();
@@ -1080,6 +1081,7 @@ bool ZGenerationOld::mark_end() {
 
   // Update statistics
   stat_heap()->at_mark_end(_page_allocator->stats(this));
+  ExCompressedStatsTable::evaluate_table(_id, _seqnum);
 
   // Block resurrection of weak/phantom references
   ZResurrection::block();

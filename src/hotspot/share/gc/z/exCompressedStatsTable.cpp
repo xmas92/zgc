@@ -6,8 +6,13 @@
 #include "utilities/concurrentHashTable.inline.hpp"
 #include "utilities/globalDefinitions.hpp"
 #include "runtime/atomic.hpp"
+#include "oops/oop.hpp"
+#include "oops/instanceKlass.inline.hpp"
+#include "oops/fieldStreams.inline.hpp"
+#include "oops/oop.inline.hpp"
+#include "runtime/fieldDescriptor.inline.hpp"
+#include "runtime/atomic.hpp"
 #include <limits>
-
 
 
 class ExCompressedStatsTableConfig : public StackObj {
@@ -38,6 +43,9 @@ class ExCompressedStatsTableConfig : public StackObj {
 using ExCompressedStatsHashTable = ConcurrentHashTable<ExCompressedStatsTableConfig, MEMFLAGS_VALUE>;
 static ExCompressedStatsHashTable* _local_table = NULL;
 
+static size_t savings[2] = {0};
+static size_t heap_size[2] = {0};
+static size_t heap_cap[2] = {0};
 
 static volatile size_t _count = 0;
 void ExCompressedStatsTable::item_added() {
@@ -50,6 +58,27 @@ void ExCompressedStatsTable::create_table() {
     assert(_local_table == NULL, "Should only create ExCompressedStatsHashTable once");
     log_info(gc, coops)("Creating ExCompressedStatsHashTable");
     _local_table = new ExCompressedStatsHashTable();
+}
+void ExCompressedStatsTable::evaluate_table(ZGenerationId id, uint32_t seqnum) {
+    if (!ExUseDynamicCompressedOops)
+        return;
+    assert(_local_table != NULL, "Should have been created");
+    log_info(gc, coops)("%s: Evaluating ExCompressedStatsHashTable",
+            (id == ZGenerationId::young) ? "Young" : "Old");
+    auto func = [id, seqnum](ExCompressedStatsTableConfig::Value* value){
+        (*value)->evaluate(id, seqnum);
+        return true;
+    };
+    savings[(uint8_t)id] = 0;
+    heap_size[(uint8_t)id] = Universe::heap()->used();
+    heap_cap[(uint8_t)id] = Universe::heap()->max_capacity();
+    if (!SafepointSynchronize::is_at_safepoint()) {
+        _local_table->do_scan(Thread::current(), func);
+    } else {
+        _local_table->do_safepoint_scan(func);
+    }
+    log_info(gc, coops)("%s: Availiable savings: %ld MB (%ld)",
+            (id == ZGenerationId::young) ? "Young" : "Old", savings[(uint8_t)id] / M, savings[(uint8_t)id]);
 }
 
 struct Lookup {
@@ -92,11 +121,173 @@ void ExCompressedStatsTable::unload_klass(Klass* klass) {
     }
 }
 
+ExCompressedFieldStatsData::ExCompressedFieldStatsData()
+    :  _min(std::numeric_limits<size_t>::max()), _max(0), _num_null(0), _distribution{0} {}
+
 ExCompressedStatsData::ExCompressedStatsData(Klass* klass)
-    : _klass(klass), _min{std::numeric_limits<std::remove_extent<decltype(_min)>::type>::max()}, _max{0}, _num_instances{0}, _distribution{0}  {
-        static_assert(std::numeric_limits<std::remove_extent<decltype(_max)>::type>::min() == 0, "Use unsigned type");
+    : _klass(klass), _num_instances{0}, _seqnum{0}, _field_data{}   {
+
+    if (_klass->is_instance_klass()) {
+        InstanceKlass* ik = InstanceKlass::cast(_klass);
+        size_t num_fields = 0;
+        for (AllFieldStream fs(ik); !fs.done(); fs.next()) {
+            if (!fs.access_flags().is_static() &&
+                    is_reference_type(fs.field_descriptor().field_type())) {
+                num_fields++;
+            }
+        }
+        if (num_fields > 0) {
+            _field_data[0].at_grow(num_fields,ExCompressedFieldStatsData());
+            _field_data[1].at_grow(num_fields,ExCompressedFieldStatsData());
+        }
+    }
 }
 
 ExCompressedStatsData::~ExCompressedStatsData() {
 
+}
+
+void ExCompressedStatsData::ex_handle_object_instanceklass(ZGenerationId id, uint32_t seqnum, oop obj, InstanceKlass* ik) {
+    // TODO add assert check that ik is in obj superklass hiearchy
+    assert(_klass == ik, "sanity");
+    ex_handle_seqnum(id, seqnum);
+    ex_handle_object_common(id, obj, ik);
+}
+
+void ExCompressedStatsData::ex_handle_object(ZGenerationId id, uint32_t seqnum, oop obj) {
+    assert(_klass == obj->klass(), "must be same class");
+    if (_klass->is_instance_klass()) {
+        InstanceKlass* ik = InstanceKlass::cast(_klass);
+        ex_handle_object_instanceklass(id, seqnum, obj, ik);
+    }
+}
+
+void ExCompressedStatsData::ex_handle_object_common(ZGenerationId id, oop obj, InstanceKlass* ik) {
+    // Bump instance count.
+    Atomic::inc(_num_instances + (uint8_t)id, memory_order_relaxed);
+
+    // Handle local fields
+    int i = 0;
+    for (AllFieldStream fs(ik); !fs.done(); fs.next()) {
+        if (!fs.access_flags().is_static() &&
+                is_reference_type(fs.field_descriptor().field_type())) {
+            oop field = obj->obj_field(fs.offset());
+            _field_data->at((uint8_t)id).ex_handle_field(obj, field);
+        }
+        ++i;
+    }
+}
+
+void ExCompressedFieldStatsData::ex_handle_field(oop obj, oop field) {
+    assert(oopDesc::is_oop_or_null(field), "sanity");
+    size_t delta;
+    if (field == NULL) {
+        Atomic::inc(&_num_null);
+        return;
+    }
+    if (oopDesc::compare(obj, field) < 0) {
+       delta = pointer_delta(field, obj, 1);
+    } else {
+       delta = pointer_delta(obj, field, 1);
+    }
+    assert(delta < (std::numeric_limits<size_t>::max() >> 1), "should be true");
+    // need one bit for direction
+    delta = delta << 1;
+
+    // store min and max deltas
+    size_t prev_min = Atomic::load(&_min);
+    if (prev_min > delta) {
+        size_t load_min = prev_min;
+        do {
+            prev_min = load_min;
+            load_min = Atomic::cmpxchg(&_min, prev_min, delta);
+            if (load_min <= delta)
+                break;
+        } while (prev_min != load_min);
+    }
+    size_t prev_max = Atomic::load(&_min);
+    if (prev_max < delta) {
+        size_t load_max = prev_max;
+        do {
+            prev_max = load_max;
+            load_max = Atomic::cmpxchg(&_max, prev_max, delta);
+            if (load_max >= delta)
+                break;
+        } while (prev_min != load_max);
+    }
+    int i = -1;
+    do {
+        delta >>= 8;
+        ++i;
+    } while (delta != 0);
+    assert(i >= 0 && i < 8, "sanity");
+    Atomic::inc(_distribution + i);
+}
+
+void ExCompressedStatsData::reset_data(ZGenerationId id) {
+    _num_instances[(uint8_t)id] = 0;
+    for (int i = 0; i < _field_data[(uint8_t)id].length(); ++i) {
+        _field_data[(uint8_t)id].at(i).reset_data();
+    }
+}
+void ExCompressedFieldStatsData::reset_data() {
+    _min = std::numeric_limits<size_t>::max();
+    _max = 0;
+    _num_null = 0;
+    for (size_t i = 0; i < sizeof(size_t); ++i) {
+        _distribution[i] = 0;
+    }
+}
+void ExCompressedStatsData::ex_handle_seqnum(ZGenerationId id, uint32_t seqnum) {
+    auto* seqnum_ptr = _seqnum + (uint8_t)id;
+    uint64_t cur_seqnum = Atomic::load(seqnum_ptr);
+    uint64_t new_seqnum = (uint64_t)seqnum << 1;
+    // _seqnum is either:
+    //         * previous seqnum (must lock and reset)
+    //         * same as cur_seqnum (free to use)
+    //         * cur_seqnum + 1 (locked and reseting)
+    while (cur_seqnum != new_seqnum) {
+        if (cur_seqnum % 1 == 0) {
+            // No one has locked
+            size_t loaded_seqnum = Atomic::cmpxchg(seqnum_ptr, cur_seqnum, new_seqnum+1);
+            // Why reload, cmpxchg does not return value?
+            if (cur_seqnum == loaded_seqnum) {
+                // Aquired lock
+                reset_data(id);
+                // Release lock
+                Atomic::release_store(seqnum_ptr, new_seqnum);
+                break;
+            }
+            cur_seqnum = loaded_seqnum;
+            assert(cur_seqnum % 1 == 1 || cur_seqnum == new_seqnum, "should be locked or set");
+        } else {
+            // Locked, reload and try again.
+            cur_seqnum = Atomic::load(seqnum_ptr);
+        }
+    }
+}
+
+void ExCompressedStatsData::evaluate(ZGenerationId id, uint32_t seqnum) {
+    LogTarget(Info, gc, coops) lt;
+    if (lt.is_enabled && _num_instances[(uint8_t)id] > 0 && _seqnum[(uint8_t)id] >> 1 == seqnum - 1) {
+        ResourceMark rm;
+        auto compression_gains = InstanceKlass::cast(_klass)->compression_gains();
+        savings[(uint8_t)id] += compression_gains->get_min_comperssion() * _num_instances[(uint8_t)id];
+        lt.print("%s:[%3ld][%3ld][%6ld] Class: %s. ",
+            (id == ZGenerationId::young) ? "Young" : "Old",
+             compression_gains->get_min_comperssion(),
+             compression_gains->get_max_comperssion(),
+             _num_instances[(uint8_t)id],
+             _klass->name()->as_C_string());
+        for (int i = 0; i < _field_data[(uint8_t)id].length(); ++i) {
+            auto& field_data = _field_data[(uint8_t)id].at(i);
+            if (field_data.get_max() > heap_cap[(uint8_t)id]) {
+                lt.print("    FarField: %10ld/%ld", field_data.get_max(), heap_cap[(uint8_t)id]);
+                auto dist = field_data.get_distribution();
+                lt.print(" Distibution: [%6ld|%6ld|%6ld|%6ld|%6ld|%6ld|%6ld|%6ld|%6ld]",
+                    field_data.get_num_null(),
+                    dist[0], dist[1], dist[2], dist[3], dist[4], dist[5], dist[6], dist[7]);
+            }
+        }
+    }
 }

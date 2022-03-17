@@ -1294,6 +1294,18 @@ public:
       assert(_compression_gains == NULL, "invariant");
     }
   }
+  void ex_handle_object(ZGenerationId id, uint32_t seqnum, oop obj) {
+    ex_handle_object_super(id, seqnum, obj);
+    if (_compressed_stats_data_entry != NULL) {
+      _compressed_stats_data_entry->ex_handle_object_instanceklass(id, seqnum, obj, this);
+    }
+  }
+  void ex_handle_object_super(ZGenerationId id, uint32_t seqnum, oop obj) {
+    InstanceKlass* super = superklass();
+    if (super != NULL) {
+      super->ex_handle_object(id, seqnum, obj);
+    }
+  }
 };
 
 // for adding methods
