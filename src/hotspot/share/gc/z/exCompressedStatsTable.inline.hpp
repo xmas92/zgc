@@ -49,7 +49,7 @@ inline void ExCompressionHeuristics::handle_loaded_instance_class(InstanceKlass*
     LogTarget(Info, gc, coops) lt;
     if (lt.is_enabled()) {
         ResourceMark rm;
-        lt.print("[Compression Gains for %s]: %ld-(%ld,%ld) over %hd fields", ik->external_name(),
+        lt.print("[Compression Gains for %s]: %d-(%d,%d) over %hd fields", ik->external_name(),
             compression_gains->get_uncompressed_size(),
             compression_gains->get_min_comperssion(), compression_gains->get_max_comperssion(),
             compression_gains->get_num_reference_fields());
@@ -64,6 +64,31 @@ inline void ExCompressionHeuristics::handle_loaded_instance_class(InstanceKlass*
     }
     ik->set_compression_gains(compression_gains);
     compression_gains = NULL;
+}
+
+inline void ExCompressionHeuristics::handle_mark_object(oop obj, ZGenerationId id, uint32_t seqnum) {
+  if (ExUseDynamicCompressedOops)  {
+    if (obj == NULL) {
+        return;
+    }
+    if (obj->is_instance()) {
+      InstanceKlass::cast(obj->klass())->ex_handle_object(id, seqnum, obj);
+    }
+    if (obj->is_objArray()) {
+        ObjArrayKlass::cast(obj->klass());
+      //InstanceKlass::cast(obj->klass())->ex_handle_object(id, seqnum, obj);
+    }
+  }
+}
+
+inline void ExCompressionHeuristics::initialize() {
+    if (UseZGC && ExUseDynamicCompressedOops) {
+        init_max_address_size();
+        log_info(gc,coops)("Virtual Heap Size: %ld MB",  get_max_address_size()/ M);
+        log_info(gc,coops)("Max Delta in Heap: %ld M", get_max_address_size_delta() / M);
+        log_info(gc,coops)("Assumed Max Bytes: %ld B / Reference", get_max_bytes_per_reference());
+        ExCompressedStatsTable::create_table();
+    }
 }
 
 #endif // SHARE_GC_Z_EXCOMPRESSEDSTATSTABLE_INLINE_HPP

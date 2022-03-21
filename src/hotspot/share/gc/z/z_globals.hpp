@@ -66,6 +66,12 @@
   product(bool, ExCompressInternals, false,                                 \
           "Exjobb compress internal klasses")                               \
                                                                             \
+  product(bool, ExCompressOopsSizePowerOfTwo, false,                        \
+          "Exjobb force compressed oops to be power of two sized")          \
+                                                                            \
+  product(bool, ExCompressOopsAlignPowerOfTwo, false,                       \
+          "Exjobb force compressed oops to be Align of two sized")          \
+                                                                            \
   product(uintx, ZUncommitDelay, 5 * 60,                                    \
           "Uncommit memory if it has been unused for the specified "        \
           "amount of time (in seconds)")                                    \

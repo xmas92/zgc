@@ -198,7 +198,7 @@ class FieldLayout : public ResourceObj {
   LayoutRawBlock* insert(LayoutRawBlock* slot, LayoutRawBlock* block);
   void remove(LayoutRawBlock* block);
   void print(outputStream* output, bool is_static, const InstanceKlass* super);
-  void calculate_compression_gains(ExCompressionGains* compression_gains, size_t max_heap_size, bool is_contended);
+  void calculate_compression_gains(ExCompressionGains* compression_gains, bool is_contended);
 };
 
 
@@ -256,7 +256,7 @@ class FieldLayoutBuilder : public ResourceObj {
   void build_layout();
   void compute_regular_layout();
   void insert_contended_padding(LayoutRawBlock* slot);
-  void calculate_compression_gains(ExCompressionGains* compression_gains, size_t max_heap_size = MaxHeapSize);
+  void calculate_compression_gains(ExCompressionGains* compression_gains);
 
  private:
   void prologue();

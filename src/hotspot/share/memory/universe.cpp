@@ -80,7 +80,7 @@
 #include "utilities/macros.hpp"
 #include "utilities/ostream.hpp"
 #include "utilities/preserveException.hpp"
-#include "gc/z/exCompressedStatsTable.hpp"
+#include "gc/z/exCompressedStatsTable.inline.hpp"
 
 // Known objects
 Klass* Universe::_typeArrayKlassObjs[T_LONG+1]        = { NULL /*, NULL...*/ };
@@ -754,10 +754,9 @@ jint universe_init() {
     return JNI_EINVAL;
   }
 
-  // TODO: Init CompressedTable
-  if (UseZGC && ExUseDynamicCompressedOops) {
-    ExCompressedStatsTable::create_table();
-  }
+  // Initialize Exjobb Compressed Oops
+  ExCompressionHeuristics::initialize();
+
 
   // Create memory for metadata.  Must be after initializing heap for
   // DumpSharedSpaces.

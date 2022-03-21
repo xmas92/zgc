@@ -82,45 +82,63 @@ private:
     void reset_data(ZGenerationId id);
 };
 
-class ExCompressionGains : public CHeapObj<MEMFLAGS_VALUE> {
-    size_t _min_compression;
-    size_t _max_compression;
-    size_t _uncompressed_size;
-    u2     _num_reference_fields;
-public:
-    void set_compression(size_t min_compression, size_t max_compression) {
-        _min_compression = min_compression;
-        _max_compression = max_compression;
-        assert(_min_compression <= max_compression, "sanity");
-    }
-    void set_num_reference_fields(u2 num_reference_fields) {
-        _num_reference_fields = num_reference_fields;
-    }
-    void set_uncompressed_size(size_t uncompressed_size) {
-        _uncompressed_size = uncompressed_size;
-    }
-    size_t get_uncompressed_size() {
-        return _uncompressed_size;
-    }
-    size_t get_min_comperssion() {
-       return _min_compression;
-    }
-    size_t get_max_comperssion() {
-       return _max_compression;
-    }
-    u2 get_num_reference_fields() {
-        return _num_reference_fields;
-    }
-};
+class ExCompressionGains ;
 
 class ExCompressionHeuristics : StackObj {
     friend class ExCompressionGains;
 private:
     static inline ExCompressedStatsData::CompressionStatus log_rejected(InstanceKlass* ik, const char* reason);
-    static inline  ExCompressedStatsData::CompressionStatus log_selected(ExCompressedStatsData::CompressionStatus status, InstanceKlass* ik, const char* reason);
-    static inline  ExCompressedStatsData::CompressionStatus should_consider_compression_of_loaded_instance_klass(InstanceKlass* ik, ExCompressionGains* compression_gains);
+    static inline ExCompressedStatsData::CompressionStatus log_selected(ExCompressedStatsData::CompressionStatus status, InstanceKlass* ik, const char* reason);
+    static inline ExCompressedStatsData::CompressionStatus should_consider_compression_of_loaded_instance_klass(InstanceKlass* ik, ExCompressionGains* compression_gains);
+
+    static void init_max_address_size();
 public:
     static inline void handle_loaded_instance_class(InstanceKlass* ik, ExCompressionGains*& compression_gains);
+    static inline void handle_mark_object(oop obj, ZGenerationId id, uint32_t seqnum);
+    static inline void initialize();
+
+    static size_t get_max_address_size();
+    static size_t get_max_address_size_delta();
+    static size_t get_max_bytes_per_reference();
+};
+
+class ExCompressionGains : public CHeapObj<MEMFLAGS_VALUE> {
+    uint32_t _compression[sizeof(size_t)];
+    uint32_t _min_compression;
+    uint32_t _max_compression;
+    uint32_t _uncompressed_size;
+    u2     _num_reference_fields;
+public:
+    void set_compression(const uint32_t* compression) {
+        for (size_t i = 0; i < sizeof(size_t) - 1; ++i) {
+            assert(compression[i] >= compression[i+1], "sanity");
+        }
+        for (size_t i = 0; i < sizeof(size_t); ++i) {
+            _compression[i] = compression[i];
+        }
+    }
+    void set_num_reference_fields(u2 num_reference_fields) {
+        _num_reference_fields = num_reference_fields;
+    }
+    void set_uncompressed_size(uint32_t uncompressed_size) {
+        _uncompressed_size = uncompressed_size;
+    }
+    uint32_t get_uncompressed_size() {
+        return _uncompressed_size;
+    }
+    uint32_t get_min_comperssion() {
+       return _compression[ExCompressionHeuristics::get_max_bytes_per_reference() - 1];
+    }
+    uint32_t get_max_comperssion() {
+       return _compression[0];
+    }
+    uint32_t get_comperssion(int reference_bytes) {
+        assert(reference_bytes >= 1 && (size_t)reference_bytes <= sizeof(size_t), "must be valid number of bytes");
+        return _compression[reference_bytes-1];
+    }
+    u2 get_num_reference_fields() {
+        return _num_reference_fields;
+    }
 };
 
 

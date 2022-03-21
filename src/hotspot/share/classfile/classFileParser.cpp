@@ -6045,7 +6045,7 @@ void ClassFileParser::post_process_parsed_stream(const ClassFileStream* const st
   if (UseZGC && ExUseDynamicCompressedOops) {
     ResourceMark rm;
     _compression_gains = new ExCompressionGains();
-    lb.calculate_compression_gains(_compression_gains, Universe::heap()->max_capacity());
+    lb.calculate_compression_gains(_compression_gains);
   }
   // Compute reference typ
   _rt = (NULL ==_super_klass) ? REF_NONE : _super_klass->reference_type();

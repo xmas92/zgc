@@ -705,27 +705,13 @@ void FieldLayoutBuilder::build_layout() {
   compute_regular_layout();
 }
 
-void FieldLayoutBuilder::calculate_compression_gains(ExCompressionGains* compression_gains, size_t max_heap_size) {
-  _layout->calculate_compression_gains(compression_gains, max_heap_size, _is_contended);
+void FieldLayoutBuilder::calculate_compression_gains(ExCompressionGains* compression_gains) {
+  _layout->calculate_compression_gains(compression_gains, _is_contended);
 }
 
-void FieldLayout::calculate_compression_gains(ExCompressionGains* compression_gains, size_t max_heap_size, bool is_contended) {
+void FieldLayout::calculate_compression_gains(ExCompressionGains* compression_gains, bool is_contended) {
   ResourceMark rm;
   assert(compression_gains != NULL, "sanity");
-  assert(max_heap_size > 0, "sanity");
-  int max_heap_size_bytes;
-  if (log2i(max_heap_size) + ExDynamicCompressedOopsMetaDataBits + 2 >= sizeof(size_t) * BitsPerByte) {
-    max_heap_size = std::numeric_limits<size_t>::max();
-    max_heap_size_bytes = sizeof(size_t);
-  } else {
-    max_heap_size <<= (ExDynamicCompressedOopsMetaDataBits + 1);
-    int max_heap_size_bits = log2i(max_heap_size) + 1;
-    if (max_heap_size_bits == 0) {
-      max_heap_size_bytes = 1;
-    } else {
-      max_heap_size_bytes = (max_heap_size_bits + BitsPerByte - 1) / BitsPerByte;
-    }
-  }
   LayoutRawBlock* last_super = NULL;
   LayoutRawBlock* b = _blocks;
   GrowableArray<LayoutRawBlock*> empty_blocks;
@@ -738,11 +724,12 @@ void FieldLayout::calculate_compression_gains(ExCompressionGains* compression_ga
       case LayoutRawBlock::FLATTENED:
         // TODO: Check what FLATTENED field actually means.
       case LayoutRawBlock::REGULAR:
-          if (b->is_reference()) {
-            reference_blocks.push(b);
-          }
+        if (b->is_reference()) {
+          reference_blocks.push(b);
+        }
+        break;
       case LayoutRawBlock::EMPTY:
-            empty_blocks.push(b);
+        empty_blocks.push(b);
         break;
       case LayoutRawBlock::RESERVED:
       case LayoutRawBlock::PADDING:
@@ -750,22 +737,30 @@ void FieldLayout::calculate_compression_gains(ExCompressionGains* compression_ga
     }
     b = b->next_block();
   }
+  uint32_t compression[sizeof(size_t)] = {0};
   compression_gains->set_num_reference_fields(reference_blocks.length());
   compression_gains->set_uncompressed_size(align_up(_last->offset(), MinObjAlignmentInBytes));
   if (reference_blocks.length() == 0) {
-    compression_gains->set_compression(0,0);
+    compression_gains->set_compression(compression);
     return;
   }
   if (last_super == NULL) {
     assert(_blocks->kind() == LayoutRawBlock::RESERVED, "should be header, no inherited fields");
     last_super = _blocks;
   }
+  // Max alignment of blocks excluding references
+  int max_alignment = 1;
+  b = last_super->next_block();
+  while (b != _last) {
+    if (!b->is_reference()) {
+      max_alignment = MAX2(max_alignment, b->alignment());
+    }
+    b = b->next_block();
+  }
   if (is_contended) {
     // When is_contended we can shrink reference field blocks and adjacent empty blocks
     // But no reordering so must respect alignment.
     assert(reference_blocks.length() == 0 || reference_blocks.first()->offset() > last_super->offset(), "sanity");
-    size_t min_compression = 0;
-    size_t max_compression = 0;
     for (int i = 0, j = 0; i < reference_blocks.length(); ++i) {
       LayoutRawBlock* reference_block = reference_blocks.at(i);
       LayoutRawBlock* empty_block = NULL;
@@ -810,55 +805,75 @@ void FieldLayout::calculate_compression_gains(ExCompressionGains* compression_ga
         end_offset += next->size();
         next = next->next_block();
       }
-      int max_alignment = 0;
-      while (next != _last) {
-        if (next->is_reference())
-          continue;
-        int next_alignment = next->alignment();
-        next = next->next_block();
-      };
       assert(end_offset > start_offset, "sanity");
-      int block_size = end_offset - start_offset;
-      assert((block_size - num_references * max_heap_size_bytes) >= 0, "sanity");
-      min_compression += ((block_size - num_references * max_heap_size_bytes) / max_alignment) * max_alignment;
-      max_compression += ((block_size - num_references) / max_alignment) * max_alignment;
+      assert(((end_offset - start_offset) - num_references * heapOopSize) >= 0, "sanity");
+      // Found possible block to compress
+      for (size_t i = 0; i < sizeof(size_t); ++i) {
+        int reference_size_bytes = i + 1;
+        if (ExCompressOopsSizePowerOfTwo) {
+          reference_size_bytes = round_up_power_of_2(reference_size_bytes);
+        }
+        int reference_alignment = 1;
+        if (ExCompressOopsAlignPowerOfTwo) {
+          reference_alignment = round_up_power_of_2(reference_size_bytes);
+        }
+        int block_size = end_offset - align_up(start_offset, reference_alignment);
+        assert((block_size - num_references * MAX2(reference_size_bytes,reference_alignment)) >= 0, "sanity");
+        compression[i] += ((block_size - num_references * MAX2(reference_size_bytes,reference_alignment)) / max_alignment) * max_alignment;
+      }
     }
-    min_compression = align_down(min_compression, MinObjAlignmentInBytes);
-    max_compression = align_down(max_compression, MinObjAlignmentInBytes);
-    compression_gains->set_compression(min_compression, max_compression);
+    for (size_t i = 0; i < sizeof(size_t); ++i) {
+      compression[i] = align_down(compression[i], MinObjAlignmentInBytes);
+    }
+    compression_gains->set_compression(compression);
     return;
   }
 
   // First pack as many references in the super as posible
-  u2 min_packed = 0;
-  u2 max_packed = 0;
+  u2 packed[sizeof(size_t)] = {0};
   int i = 0, j = 0;
   int super_end = align_up(last_super->offset() + last_super->size(), MinObjAlignmentInBytes);
   if (UseEmptySlotsInSupers) {
     for (; i < reference_blocks.length(); ++i) {
       LayoutRawBlock* reference_block = reference_blocks.at(i);
       LayoutRawBlock* empty_block = NULL;
+      // Fill empty block before reference block
+      // and find potential empty block directly before reference block
       while (j < empty_blocks.length()) {
         empty_block = empty_blocks.at(j);
         if (empty_block->offset() >= super_end) {
+          // No more empty blocks in super
+          empty_block = NULL;
           break;
         } else if (empty_block->offset() > reference_block->offset()) {
+          // Checked all empty block before reference block
           empty_block = NULL;
           break;
         } else if (empty_block->offset() + empty_block->size() == reference_block->offset() &&
                    empty_block != last_super->next_block()) {
+          // Found an empty block directly before reference block
           ++j;
           break;
         } else if (empty_block->offset() < super_end) {
-          int empty_block_size = empty_block->size();
-          assert(empty_block_size > 0, "sanity");
-          max_packed += empty_block_size;
-          min_packed += empty_block_size / max_heap_size_bytes;
+          // Empty block in super, try to fit references.
+          for (size_t i = 0; i < sizeof(size_t); ++i) {
+            int reference_size_bytes = i + 1;
+            if (ExCompressOopsSizePowerOfTwo) {
+              reference_size_bytes = round_up_power_of_2(reference_size_bytes);
+            }
+            int reference_alignment = 1;
+            if (ExCompressOopsAlignPowerOfTwo) {
+              reference_alignment = round_up_power_of_2(reference_size_bytes);
+            }
+            int empty_block_size = empty_block->size() - (align_up(empty_block->offset(), reference_alignment)-empty_block->offset());
+            packed[i] += empty_block_size / MAX2(reference_size_bytes, reference_alignment);
+          }
         }
         empty_block = NULL;
         ++j;
       }
       if (reference_block->offset() >= super_end) {
+        // Rest of references are not packed in super
         break;
       }
 
@@ -875,6 +890,9 @@ void FieldLayout::calculate_compression_gains(ExCompressionGains* compression_ga
         assert(end_offset == next->offset(), "sanity");
         ++j;
         end_offset += next->size();
+        // TODO: If empty here is the last block in super (aka last_super->next == next)
+        // then it might be posible to reorder all blocks to get better compression if
+        // if ExCompressOopsAlignPowerOfTwo is used.
         next = next->next_block();
         if (next == _last || !next->is_reference() || next->offset() >= super_end)
           break;
@@ -885,9 +903,18 @@ void FieldLayout::calculate_compression_gains(ExCompressionGains* compression_ga
         next = next->next_block();
       }
       assert(end_offset > start_offset, "sanity");
-      int block_size = end_offset - start_offset;
-      max_packed += block_size;
-      min_packed += block_size / max_heap_size_bytes;
+      for (size_t i = 0; i < sizeof(size_t); ++i) {
+        int reference_size_bytes = i + 1;
+        if (ExCompressOopsSizePowerOfTwo) {
+          reference_size_bytes = round_up_power_of_2(reference_size_bytes);
+        }
+        int reference_alignment = 1;
+        if (ExCompressOopsAlignPowerOfTwo) {
+          reference_alignment = round_up_power_of_2(reference_size_bytes);
+        }
+        int block_size = end_offset - align_up(start_offset, reference_alignment);
+        packed[i] += block_size / MAX2(reference_size_bytes, reference_alignment);
+      }
       if (next == _last || next->offset() >= super_end) {
         break;
       }
@@ -898,21 +925,27 @@ void FieldLayout::calculate_compression_gains(ExCompressionGains* compression_ga
     assert(j == 0 || empty_blocks.at(j-1)->offset() < super_end, "sanity");
     assert(j >= empty_blocks.length() || empty_blocks.at(j)->offset() >= super_end, "sanity");
   }
-  size_t min_compression = 0;
-  size_t max_compression = 0;
-  assert(max_packed >= min_packed, "sanity");
-  // Assume fully packed
-  max_compression = reference_blocks.length() * heapOopSize;
-  min_compression = reference_blocks.length() * heapOopSize;
-  // Fill values not packed in super
-  if (max_packed < reference_blocks.length()) {
-    max_compression -= reference_blocks.length() - max_packed;
+  for (size_t i = 0; i < sizeof(size_t) - 1; ++i) {
+    assert(packed[i] >= packed[i+1], "sanity");
   }
-  if (min_packed < reference_blocks.length()) {
-    min_compression -= (reference_blocks.length() - min_packed) * max_heap_size_bytes;
+  for (size_t i = 0; i < sizeof(size_t); ++i) {
+    int reference_size_bytes = i + 1;
+    if (ExCompressOopsSizePowerOfTwo) {
+      reference_size_bytes = round_up_power_of_2(reference_size_bytes);
+    }
+    int reference_alignment = 1;
+    if (ExCompressOopsAlignPowerOfTwo) {
+      reference_alignment = round_up_power_of_2(reference_size_bytes);
+    }
+    // Assume fully packed
+    compression[i] = reference_blocks.length() * heapOopSize;
+    // Fill values not packed in super
+    // TODO: Might be able to do better here when ExCompressOopsAlignPowerOfTwo is used.
+    if (packed[i] < reference_blocks.length()) {
+      compression[i] -= (reference_blocks.length() - packed[i]) * MAX2(reference_size_bytes, reference_alignment);
+    }
+    // Align
+    compression[i] = align_down(compression[i], MinObjAlignmentInBytes);
   }
-  // Align
-  min_compression = align_down(min_compression, MinObjAlignmentInBytes);
-  max_compression = align_down(max_compression, MinObjAlignmentInBytes);
-  compression_gains->set_compression(min_compression, max_compression);
+  compression_gains->set_compression(compression);
 }

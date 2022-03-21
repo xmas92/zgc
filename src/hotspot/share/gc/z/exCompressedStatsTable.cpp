@@ -186,9 +186,9 @@ void ExCompressedFieldStatsData::ex_handle_field(oop obj, oop field) {
         return;
     }
     if (oopDesc::compare(obj, field) < 0) {
-       delta = pointer_delta(field, obj, 1);
+       delta = pointer_delta(field, obj, MinObjAlignmentInBytes);
     } else {
-       delta = pointer_delta(obj, field, 1);
+       delta = pointer_delta(obj, field, MinObjAlignmentInBytes);
     }
     assert(delta < (std::numeric_limits<size_t>::max() >> 1), "should be true");
     // need one bit for direction
@@ -240,7 +240,7 @@ void ExCompressedFieldStatsData::reset_data() {
 }
 void ExCompressedStatsData::ex_handle_seqnum(ZGenerationId id, uint32_t seqnum) {
     auto* seqnum_ptr = _seqnum + (uint8_t)id;
-    uint64_t cur_seqnum = Atomic::load(seqnum_ptr);
+    uint64_t cur_seqnum = Atomic::load_acquire(seqnum_ptr);
     uint64_t new_seqnum = (uint64_t)seqnum << 1;
     // _seqnum is either:
     //         * previous seqnum (must lock and reset)
@@ -262,7 +262,7 @@ void ExCompressedStatsData::ex_handle_seqnum(ZGenerationId id, uint32_t seqnum) 
             assert(cur_seqnum % 1 == 1 || cur_seqnum == new_seqnum, "should be locked or set");
         } else {
             // Locked, reload and try again.
-            cur_seqnum = Atomic::load(seqnum_ptr);
+            cur_seqnum = Atomic::load_acquire(seqnum_ptr);
         }
     }
 }
@@ -273,7 +273,7 @@ void ExCompressedStatsData::evaluate(ZGenerationId id, uint32_t seqnum) {
         ResourceMark rm;
         auto compression_gains = InstanceKlass::cast(_klass)->compression_gains();
         savings[(uint8_t)id] += compression_gains->get_min_comperssion() * _num_instances[(uint8_t)id];
-        lt.print("%s:[%3ld][%3ld][%6ld] Class: %s. ",
+        lt.print("%s:[%3d][%3d][%8ld] Class: %s. ",
             (id == ZGenerationId::young) ? "Young" : "Old",
              compression_gains->get_min_comperssion(),
              compression_gains->get_max_comperssion(),
@@ -290,4 +290,27 @@ void ExCompressedStatsData::evaluate(ZGenerationId id, uint32_t seqnum) {
             }
         }
     }
+}
+
+static size_t _max_address_size = 0;
+static size_t _max_address_size_delta = 0;
+static size_t _max_bytes_per_reference = 0;
+
+void ExCompressionHeuristics::init_max_address_size() {
+    _max_address_size = Universe::heap()->max_capacity();
+    _max_address_size *= ZVirtualToPhysicalRatio;
+    _max_address_size_delta = _max_address_size;
+    _max_address_size_delta >>= LogMinObjAlignmentInBytes;
+    _max_bytes_per_reference = (log2i(_max_address_size_delta) + ExDynamicCompressedOopsMetaDataBits + 2) / BitsPerByte;
+    _max_bytes_per_reference = MIN2(_max_bytes_per_reference, size_t(8));
+}
+
+size_t ExCompressionHeuristics::get_max_address_size() {
+    return _max_address_size;
+}
+size_t ExCompressionHeuristics::get_max_address_size_delta() {
+    return _max_address_size_delta;
+}
+size_t ExCompressionHeuristics::get_max_bytes_per_reference() {
+    return _max_bytes_per_reference;
 }
