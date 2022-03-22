@@ -133,6 +133,10 @@ ObjArrayKlass* ObjArrayKlass::allocate_objArray_klass(ClassLoaderData* loader_da
   // an array class without a mirror.
   loader_data->add_class(oak);
 
+  if (UseZGC && ExUseDynamicCompressedOops && ExCompressObjArray) {
+    ExCompressionHeuristics::handle_create_objarray_class(oak);
+  }
+
   return oak;
 }
 

@@ -72,6 +72,15 @@
   product(bool, ExCompressOopsAlignPowerOfTwo, false,                       \
           "Exjobb force compressed oops to be Align of two sized")          \
                                                                             \
+  product(bool, ExCompressObjArray, false,                                  \
+          "Use exjobb compressed oops for ObjArrays")                       \
+                                                                            \
+  product(bool, ExCompressObjArrayOfInternals, true,                        \
+          "Use compress ObjArrays of internal klasses")                     \
+                                                                            \
+  product(bool, ExCompressObjArrayOfTypeArrays, true,                       \
+          "Use compress ObjArrays of type arrays")                          \
+                                                                            \
   product(uintx, ZUncommitDelay, 5 * 60,                                    \
           "Uncommit memory if it has been unused for the specified "        \
           "amount of time (in seconds)")                                    \

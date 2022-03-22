@@ -72,11 +72,17 @@ inline void ExCompressionHeuristics::handle_mark_object(oop obj, ZGenerationId i
         return;
     }
     if (obj->is_instance()) {
-      InstanceKlass::cast(obj->klass())->ex_handle_object(id, seqnum, obj);
+        InstanceKlass::cast(obj->klass())->ex_handle_object(id, seqnum, obj);
     }
     if (obj->is_objArray()) {
-        ObjArrayKlass::cast(obj->klass());
-      //InstanceKlass::cast(obj->klass())->ex_handle_object(id, seqnum, obj);
+        const ObjArrayKlass* oak = ObjArrayKlass::cast(obj->klass());
+        const Klass* bk = oak->bottom_klass();
+        if (bk->is_instance_klass()) {
+            oak->ex_handle_object(id, seqnum, obj);
+        } else if (ExCompressObjArrayOfTypeArrays) {
+            assert(bk->is_typeArray_klass(), "invariant");
+            oak->ex_handle_object(id, seqnum, obj);
+        }
     }
   }
 }
@@ -89,6 +95,29 @@ inline void ExCompressionHeuristics::initialize() {
         log_info(gc,coops)("Assumed Max Bytes: %ld B / Reference", get_max_bytes_per_reference());
         ExCompressedStatsTable::create_table();
     }
+}
+
+inline void ExCompressionHeuristics::handle_create_objarray_class(ObjArrayKlass* oak) {
+    LogTarget(Info, gc, coops) lt;
+    if (lt.is_enabled()) {
+        ResourceMark rm;
+        lt.print("[Create ObjArray %s]", oak->external_name());
+    }
+    if (!ExCompressObjArrayOfInternals) {
+        Symbol* name = oak->bottom_klass()->name();
+        if (name->starts_with("java/") || name->starts_with("jdk/") ||name->starts_with("sun/")) {
+            if (lt.is_enabled()) {
+                ResourceMark rm;
+                lt.print("[Not compressiong ObjArray %s]: Internal Klass", oak->external_name());
+            }
+            return;
+        }
+    }
+    if (!ExCompressObjArrayOfTypeArrays && oak->bottom_klass()->is_typeArray_klass()) {
+        return;
+    }
+    oak->set_compressed_stats_data_entry(ExCompressedStatsTable::new_entry(oak));
+    oak->compressed_stats_data_entry()->initial_compression_status(ExCompressedStatsData::CompressEvaluate);
 }
 
 #endif // SHARE_GC_Z_EXCOMPRESSEDSTATSTABLE_INLINE_HPP

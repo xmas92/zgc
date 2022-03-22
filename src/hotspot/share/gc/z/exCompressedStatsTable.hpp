@@ -39,6 +39,8 @@ public:
     size_t get_num_null() { return _num_null; }
     volatile size_t* get_distribution() { return _distribution; }
 
+    size_t get_total_num();
+    size_t get_min_byte_req();
     void ex_handle_field(oop obj, oop field);
     void reset_data();
 };
@@ -69,6 +71,7 @@ public:
 
     void ex_handle_object(ZGenerationId id, uint32_t seqnum, oop obj);
     void ex_handle_object_instanceklass(ZGenerationId id, uint32_t seqnum, oop obj, InstanceKlass* ik);
+    void ex_handle_object_objarrayklass(ZGenerationId id, uint32_t seqnum, oop obj, const ObjArrayKlass* oak);
 
     void evaluate(ZGenerationId id, uint32_t seqnum);
 
@@ -94,6 +97,7 @@ private:
     static void init_max_address_size();
 public:
     static inline void handle_loaded_instance_class(InstanceKlass* ik, ExCompressionGains*& compression_gains);
+    static inline void handle_create_objarray_class(ObjArrayKlass* oak);
     static inline void handle_mark_object(oop obj, ZGenerationId id, uint32_t seqnum);
     static inline void initialize();
 

@@ -45,6 +45,9 @@ class ObjArrayKlass : public ArrayKlass {
   Klass* _element_klass;            // The klass of the elements of this array type
   Klass* _bottom_klass;             // The one-dimensional type (InstanceKlass or TypeArrayKlass)
 
+  // ExDynamicCompressedOops
+  ExCompressedStatsData* _compressed_stats_data_entry;
+
   // Constructor
   ObjArrayKlass(int n, Klass* element_klass, Symbol* name);
   static ObjArrayKlass* allocate(ClassLoaderData* loader_data, int n, Klass* k, Symbol* name, TRAPS);
@@ -172,6 +175,23 @@ class ObjArrayKlass : public ArrayKlass {
   void verify_on(outputStream* st);
 
   void oop_verify_on(oop obj, outputStream* st);
+
+  // ExDynamicCompressedOoops
+    ExCompressedStatsData* compressed_stats_data_entry() const            { return _compressed_stats_data_entry; }
+  void set_compressed_stats_data_entry(ExCompressedStatsData* compressed_stats_data_entry) {
+    guarantee(_compressed_stats_data_entry == NULL || compressed_stats_data_entry == NULL, "Just checking");
+    _compressed_stats_data_entry = compressed_stats_data_entry;
+  }
+  void ex_compression_cleanup() {
+    if (_compressed_stats_data_entry != NULL) {
+      ExCompressedStatsTable::unload_klass(this);
+    }
+  }
+  void ex_handle_object(ZGenerationId id, uint32_t seqnum, oop obj) const {
+    if (_compressed_stats_data_entry != NULL) {
+      _compressed_stats_data_entry->ex_handle_object_objarrayklass(id, seqnum, obj, this);
+    }
+  }
 };
 
 #endif // SHARE_OOPS_OBJARRAYKLASS_HPP
