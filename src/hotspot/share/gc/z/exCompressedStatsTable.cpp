@@ -339,13 +339,14 @@ void ExCompressedStatsData::evaluate(ZGenerationId id, uint32_t seqnum) {
         metadata_size[(uint8_t)id] += sizeof(ExCompressionGains);
     }
     LogTarget(Info, gc, coops) lt;
-    if (lt.is_enabled && _num_instances[(uint8_t)id] > 0 && _seqnum[(uint8_t)id] >> 1 == seqnum - 1) {
+    if (lt.is_enabled && _num_instances[(uint8_t)id] > 0 && _seqnum[(uint8_t)id] >> 1 == seqnum) {
         ResourceMark rm;
         if (_klass->is_instance_klass()) {
             auto compression_gains = InstanceKlass::cast(_klass)->compression_gains();
             ik_savings[(uint8_t)id] += compression_gains->get_min_comperssion() * _num_instances[(uint8_t)id];
-            lt.print("%s:[%3d][%3d][%8ld] Class: %s. ",
+            lt.print("%s(%d):[%3d][%3d][%8ld] Class: %s. ",
                 (id == ZGenerationId::young) ? "Young" : "Old",
+                seqnum,
                 compression_gains->get_min_comperssion(),
                 compression_gains->get_max_comperssion(),
                 _num_instances[(uint8_t)id],
@@ -365,8 +366,9 @@ void ExCompressedStatsData::evaluate(ZGenerationId id, uint32_t seqnum) {
             auto& field_data = _field_data[(uint8_t)id].at(0);
             auto total = field_data.get_total_num();
             oak_savings[(uint8_t)id] += total * field_data.get_min_byte_req();
-            lt.print("%s:[%8ld][%8ld] Class: %s. ",
+            lt.print("%s(%d):[%8ld][%8ld] Class: %s. ",
                 (id == ZGenerationId::young) ? "Young" : "Old",
+                seqnum,
                 total,
                 _num_instances[(uint8_t)id],
                 _klass->name()->as_C_string());

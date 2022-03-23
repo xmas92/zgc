@@ -305,7 +305,7 @@ inline bool ZPage::mark_object(zaddress addr, bool finalizable, bool& inc_live) 
   assert(is_relocatable(), "Invalid page state");
   assert(is_in(addr), "Invalid address");
   oop obj = to_oop(addr);
-  ExCompressionHeuristics::handle_mark_object(obj, _generation_id, _seqnum);
+  ExCompressionHeuristics::handle_mark_object(obj, _generation_id, generation()->seqnum());
 
   // Set mark bit
   const size_t index = bit_index(addr);
