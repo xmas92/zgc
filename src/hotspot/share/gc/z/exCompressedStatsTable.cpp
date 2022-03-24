@@ -45,10 +45,17 @@ static ExCompressedStatsHashTable* _local_table = NULL;
 
 static size_t ik_savings[2] = {0};
 static size_t oak_savings[2] = {0};
+static size_t ik_redundant[2] = {0};
 static size_t metadata_size[2] = {0};
 static size_t heap_size[2] = {0};
 static size_t heap_cap[2] = {0};
 
+static volatile size_t total_size[2] = {0};
+
+void ExCompressedStatsTable::register_mark_object(oop obj, ZGenerationId id) {
+    volatile size_t* total_size_ptr = total_size + (uint8_t)id;
+    Atomic::add(total_size_ptr, obj->size() * HeapWordSize, memory_order_relaxed);
+}
 static volatile size_t _count = 0;
 void ExCompressedStatsTable::item_added() {
     Atomic::inc(&_count);
@@ -73,16 +80,24 @@ void ExCompressedStatsTable::evaluate_table(ZGenerationId id, uint32_t seqnum) {
     };
     ik_savings[(uint8_t)id] = 0;
     oak_savings[(uint8_t)id] = 0;
+    ik_redundant[(uint8_t)id] = 0;
     metadata_size[(uint8_t)id] = 0;
     heap_size[(uint8_t)id] = Universe::heap()->used();
     heap_cap[(uint8_t)id] = Universe::heap()->max_capacity();
+    volatile size_t* total_size_ptr = total_size + (uint8_t)id;
+    size_t total_size = Atomic::load_acquire(total_size_ptr);
     if (!SafepointSynchronize::is_at_safepoint()) {
         _local_table->do_scan(Thread::current(), func);
     } else {
         _local_table->do_safepoint_scan(func);
     }
+    Atomic::release_store(total_size_ptr, size_t(0));
     metadata_size[(uint8_t)id] += _local_table->get_mem_size(Thread::current());
     size_t savings = ik_savings[(uint8_t)id] + oak_savings[(uint8_t)id];
+    log_info(gc, coops)("%s:    Generation Size: %ld MB (%ld)",
+            (id == ZGenerationId::young) ? "Young" : "Old", total_size / M, total_size);
+    log_info(gc, coops)("%s:    Redundant Bytes: %ld MB (%ld)",
+            (id == ZGenerationId::young) ? "Young" : "Old", ik_redundant[(uint8_t)id] / M, ik_redundant[(uint8_t)id]);
     log_info(gc, coops)("%s:      Metadata used: %ld MB (%ld)",
             (id == ZGenerationId::young) ? "Young" : "Old", metadata_size[(uint8_t)id] / M, metadata_size[(uint8_t)id]);
     log_info(gc, coops)("%s: Availiable savings: %ld MB (%ld)",
@@ -339,7 +354,8 @@ void ExCompressedStatsData::evaluate(ZGenerationId id, uint32_t seqnum) {
         metadata_size[(uint8_t)id] += sizeof(ExCompressionGains);
     }
     LogTarget(Info, gc, coops) lt;
-    if (lt.is_enabled && _num_instances[(uint8_t)id] > 0 && _seqnum[(uint8_t)id] >> 1 == seqnum) {
+    LogTarget(Debug, gc, coops) lt_debug;
+    if (lt.is_enabled() && _num_instances[(uint8_t)id] > 0 && _seqnum[(uint8_t)id] >> 1 == seqnum) {
         ResourceMark rm;
         if (_klass->is_instance_klass()) {
             auto compression_gains = InstanceKlass::cast(_klass)->compression_gains();
@@ -353,10 +369,16 @@ void ExCompressedStatsData::evaluate(ZGenerationId id, uint32_t seqnum) {
                 _klass->name()->as_C_string());
             for (int i = 0; i < _field_data[(uint8_t)id].length(); ++i) {
                 auto& field_data = _field_data[(uint8_t)id].at(i);
+                ik_redundant[(uint8_t)id] += (sizeof(size_t) - field_data.get_min_byte_req()) * _num_instances[(uint8_t)id];
                 if (field_data.get_max() > heap_cap[(uint8_t)id]) {
                     lt.print("    FarField: %10ld/%ld", field_data.get_max(), heap_cap[(uint8_t)id]);
                     auto dist = field_data.get_distribution();
                     lt.print(" Distibution: [%6ld|%6ld|%6ld|%6ld|%6ld|%6ld|%6ld|%6ld|%6ld]",
+                        field_data.get_num_null(),
+                        dist[0], dist[1], dist[2], dist[3], dist[4], dist[5], dist[6], dist[7]);
+                } else if (lt_debug.is_enabled()) {
+                    auto dist = field_data.get_distribution();
+                    lt_debug.print(" Distibution: [%6ld|%6ld|%6ld|%6ld|%6ld|%6ld|%6ld|%6ld|%6ld]",
                         field_data.get_num_null(),
                         dist[0], dist[1], dist[2], dist[3], dist[4], dist[5], dist[6], dist[7]);
                 }
@@ -377,6 +399,11 @@ void ExCompressedStatsData::evaluate(ZGenerationId id, uint32_t seqnum) {
                 lt.print("    FarArray: %10ld/%ld", field_data.get_max(), heap_cap[(uint8_t)id]);
                 auto dist = field_data.get_distribution();
                 lt.print(" Distibution: [%6ld|%6ld|%6ld|%6ld|%6ld|%6ld|%6ld|%6ld|%6ld]",
+                    field_data.get_num_null(),
+                    dist[0], dist[1], dist[2], dist[3], dist[4], dist[5], dist[6], dist[7]);
+            } else if (lt_debug.is_enabled()) {
+                auto dist = field_data.get_distribution();
+                lt_debug.print(" Distibution: [%6ld|%6ld|%6ld|%6ld|%6ld|%6ld|%6ld|%6ld|%6ld]",
                     field_data.get_num_null(),
                     dist[0], dist[1], dist[2], dist[3], dist[4], dist[5], dist[6], dist[7]);
             }

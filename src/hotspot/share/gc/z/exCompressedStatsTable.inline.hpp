@@ -71,6 +71,7 @@ inline void ExCompressionHeuristics::handle_mark_object(oop obj, ZGenerationId i
     if (obj == NULL) {
         return;
     }
+    ExCompressedStatsTable::register_mark_object(obj, id);
     if (obj->is_instance()) {
         InstanceKlass::cast(obj->klass())->ex_handle_object(id, seqnum, obj);
     }

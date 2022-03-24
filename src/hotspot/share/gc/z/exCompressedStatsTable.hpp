@@ -26,6 +26,8 @@ public:
     static void unload_klass(Klass* klass);
 
     static void evaluate_table(ZGenerationId id, uint32_t seqnum);
+
+    static void register_mark_object(oop obj, ZGenerationId id);
 };
 
 class ExCompressedFieldStatsData : public CHeapObj<MEMFLAGS_VALUE> {

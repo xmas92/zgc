@@ -96,6 +96,6 @@ const size_t      ZMarkProactiveFlushMax        = 10;
 const uint64_t    ZMarkCompleteTimeout          = 200; // us
 
 // Exjobb, in case DynamicCompressedOops require some in ptr metadata.
-const size_t ExDynamicCompressedOopsMetaDataBits = 0;
+const size_t ExDynamicCompressedOopsMetaDataBits = 1;
 
 #endif // SHARE_GC_Z_ZGLOBALS_HPP
