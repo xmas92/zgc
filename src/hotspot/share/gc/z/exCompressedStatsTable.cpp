@@ -46,6 +46,7 @@ static ExCompressedStatsHashTable* _local_table = NULL;
 static size_t ik_savings[2] = {0};
 static size_t oak_savings[2] = {0};
 static size_t ik_redundant[2] = {0};
+static size_t oak_redundant[2] = {0};
 static size_t metadata_size[2] = {0};
 static size_t heap_size[2] = {0};
 static size_t heap_cap[2] = {0};
@@ -53,8 +54,11 @@ static size_t heap_cap[2] = {0};
 static volatile size_t total_size[2] = {0};
 
 void ExCompressedStatsTable::register_mark_object(oop obj, ZGenerationId id) {
-    volatile size_t* total_size_ptr = total_size + (uint8_t)id;
-    Atomic::add(total_size_ptr, obj->size() * HeapWordSize, memory_order_relaxed);
+    LogTarget(Debug, gc, coops) lt_debug;
+    if (lt_debug.is_enabled()) {
+        volatile size_t* total_size_ptr = total_size + (uint8_t)id;
+        Atomic::add(total_size_ptr, obj->size() * HeapWordSize, memory_order_relaxed);
+    }
 }
 static volatile size_t _count = 0;
 void ExCompressedStatsTable::item_added() {
@@ -81,6 +85,7 @@ void ExCompressedStatsTable::evaluate_table(ZGenerationId id, uint32_t seqnum) {
     ik_savings[(uint8_t)id] = 0;
     oak_savings[(uint8_t)id] = 0;
     ik_redundant[(uint8_t)id] = 0;
+    oak_redundant[(uint8_t)id] = 0;
     metadata_size[(uint8_t)id] = 0;
     heap_size[(uint8_t)id] = Universe::heap()->used();
     heap_cap[(uint8_t)id] = Universe::heap()->max_capacity();
@@ -94,17 +99,24 @@ void ExCompressedStatsTable::evaluate_table(ZGenerationId id, uint32_t seqnum) {
     Atomic::release_store(total_size_ptr, size_t(0));
     metadata_size[(uint8_t)id] += _local_table->get_mem_size(Thread::current());
     size_t savings = ik_savings[(uint8_t)id] + oak_savings[(uint8_t)id];
+    size_t redundant = ik_redundant[(uint8_t)id] + oak_redundant[(uint8_t)id];
     log_info(gc, coops)("%s:    Generation Size: %ld MB (%ld)",
             (id == ZGenerationId::young) ? "Young" : "Old", total_size / M, total_size);
     log_info(gc, coops)("%s:    Redundant Bytes: %ld MB (%ld)",
+            (id == ZGenerationId::young) ? "Young" : "Old", redundant / M, redundant);
+    if (ExCompressObjArray) {
+    log_info(gc, coops)("%s:     Instance Klass: %ld MB (%ld)",
             (id == ZGenerationId::young) ? "Young" : "Old", ik_redundant[(uint8_t)id] / M, ik_redundant[(uint8_t)id]);
+    log_info(gc, coops)("%s:     ObjArray Klass: %ld MB (%ld)",
+            (id == ZGenerationId::young) ? "Young" : "Old", oak_redundant[(uint8_t)id] / M, oak_redundant[(uint8_t)id]);
+    }
     log_info(gc, coops)("%s:      Metadata used: %ld MB (%ld)",
             (id == ZGenerationId::young) ? "Young" : "Old", metadata_size[(uint8_t)id] / M, metadata_size[(uint8_t)id]);
     log_info(gc, coops)("%s: Availiable savings: %ld MB (%ld)",
             (id == ZGenerationId::young) ? "Young" : "Old", savings / M, savings);
+    if (ExCompressObjArray) {
     log_info(gc, coops)("%s:     Instance Klass: %ld MB (%ld)",
             (id == ZGenerationId::young) ? "Young" : "Old", ik_savings[(uint8_t)id] / M, ik_savings[(uint8_t)id]);
-    if (ExCompressObjArray) {
     log_info(gc, coops)("%s:     ObjArray Klass: %ld MB (%ld)",
             (id == ZGenerationId::young) ? "Young" : "Old", oak_savings[(uint8_t)id] / M, oak_savings[(uint8_t)id]);
     }
@@ -387,7 +399,8 @@ void ExCompressedStatsData::evaluate(ZGenerationId id, uint32_t seqnum) {
             assert(_klass->is_objArray_klass(), "invariant");
             auto& field_data = _field_data[(uint8_t)id].at(0);
             auto total = field_data.get_total_num();
-            oak_savings[(uint8_t)id] += total * field_data.get_min_byte_req();
+            oak_savings[(uint8_t)id] += total * (sizeof(size_t) - ExCompressionHeuristics::get_max_bytes_per_reference());
+            oak_redundant[(uint8_t)id] += total * (sizeof(size_t) - field_data.get_min_byte_req());
             lt.print("%s(%d):[%8ld][%8ld] Class: %s. ",
                 (id == ZGenerationId::young) ? "Young" : "Old",
                 seqnum,
@@ -420,7 +433,7 @@ void ExCompressionHeuristics::init_max_address_size() {
     _max_address_size *= ZVirtualToPhysicalRatio;
     _max_address_size_delta = _max_address_size;
     _max_address_size_delta >>= LogMinObjAlignmentInBytes;
-    _max_bytes_per_reference = (log2i(_max_address_size_delta) + ExDynamicCompressedOopsMetaDataBits + 2) / BitsPerByte;
+    _max_bytes_per_reference = (log2i(_max_address_size_delta) + ExDynamicCompressedOopsMetaDataBits + 2 + BitsPerByte - 1) / BitsPerByte;
     _max_bytes_per_reference = MIN2(_max_bytes_per_reference, size_t(8));
 }
 

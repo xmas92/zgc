@@ -305,11 +305,14 @@ inline bool ZPage::mark_object(zaddress addr, bool finalizable, bool& inc_live) 
   assert(is_relocatable(), "Invalid page state");
   assert(is_in(addr), "Invalid address");
   oop obj = to_oop(addr);
-  ExCompressionHeuristics::handle_mark_object(obj, _generation_id, generation()->seqnum());
 
   // Set mark bit
   const size_t index = bit_index(addr);
-  return _livemap.set(_generation_id, index, finalizable, inc_live);
+  const bool result = _livemap.set(_generation_id, index, finalizable, inc_live);
+  if (result) {
+    ExCompressionHeuristics::handle_mark_object(obj, _generation_id, generation()->seqnum());
+  }
+  return result;
 }
 
 inline void ZPage::inc_live(uint32_t objects, size_t bytes) {
