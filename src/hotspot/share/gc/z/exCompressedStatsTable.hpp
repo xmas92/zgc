@@ -31,7 +31,7 @@ public:
 };
 
 class ExCompressedFieldStatsData : public CHeapObj<MEMFLAGS_VALUE> {
-    volatile size_t _min, _max, _num_null;
+    volatile size_t _min, _max, _num_null, _max_num_worse_distribution;
     volatile size_t _distribution[sizeof(size_t)];
 public:
     ExCompressedFieldStatsData();
@@ -40,6 +40,9 @@ public:
     size_t get_min() { return _min; }
     size_t get_num_null() { return _num_null; }
     volatile size_t* get_distribution() { return _distribution; }
+
+    size_t get_num_worse();
+    size_t get_num_worse_byte_req();
 
     size_t get_total_num();
     size_t get_min_byte_req();

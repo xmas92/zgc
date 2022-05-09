@@ -100,7 +100,7 @@ void ExCompressedStatsTable::evaluate_table(ZGenerationId id, uint32_t seqnum) {
     metadata_size[(uint8_t)id] += _local_table->get_mem_size(Thread::current());
     size_t savings = ik_savings[(uint8_t)id] + oak_savings[(uint8_t)id];
     size_t redundant = ik_redundant[(uint8_t)id] + oak_redundant[(uint8_t)id];
-    log_info(gc, coops)("%s:    Generation Size: %ld MB (%ld)",
+    log_debug(gc, coops)("%s:    Generation Size: %ld MB (%ld)",
             (id == ZGenerationId::young) ? "Young" : "Old", total_size / M, total_size);
     log_info(gc, coops)("%s:    Redundant Bytes: %ld MB (%ld)",
             (id == ZGenerationId::young) ? "Young" : "Old", redundant / M, redundant);
@@ -164,7 +164,7 @@ void ExCompressedStatsTable::unload_klass(Klass* klass) {
 }
 
 ExCompressedFieldStatsData::ExCompressedFieldStatsData()
-    :  _min(std::numeric_limits<size_t>::max()), _max(0), _num_null(0), _distribution{0} {}
+    :  _min(std::numeric_limits<size_t>::max()), _max(0), _num_null(0), _max_num_worse_distribution(0), _distribution{0} {}
 
 ExCompressedStatsData::ExCompressedStatsData(Klass* klass)
     : _klass(klass), _num_instances{0}, _seqnum{0}, _field_data{}   {
@@ -186,6 +186,9 @@ ExCompressedStatsData::ExCompressedStatsData(Klass* klass)
         assert(_klass->is_objArray_klass(), "invariant");
         _field_data[0].append(ExCompressedFieldStatsData());
         _field_data[1].append(ExCompressedFieldStatsData());
+        // For per objArray max element delta
+        _field_data[0].append(ExCompressedFieldStatsData());
+        _field_data[1].append(ExCompressedFieldStatsData());
     }
 }
 
@@ -200,6 +203,14 @@ void ExCompressedStatsData::ex_handle_object_instanceklass(ZGenerationId id, uin
     ex_handle_object_common(id, obj, ik);
 }
 
+inline size_t pointer_delta_unord(oop o1, oop o2) {
+    if (oopDesc::compare(o1, o2) < 0) {
+       return pointer_delta(o2, o1, MinObjAlignmentInBytes);
+    } else {
+       return pointer_delta(o1, o2, MinObjAlignmentInBytes);
+    }
+}
+
 void ExCompressedStatsData::ex_handle_object_objarrayklass(ZGenerationId id, uint32_t seqnum, oop obj, const ObjArrayKlass* oak) {
     // TODO add assert check that ik is in obj superklass hiearchy
     assert(_klass == oak, "sanity");
@@ -210,10 +221,25 @@ void ExCompressedStatsData::ex_handle_object_objarrayklass(ZGenerationId id, uin
     struct Closure : public OopClosure {
         ExCompressedFieldStatsData& _data;
         objArrayOop _objarray_oop;
-        Closure(ExCompressedFieldStatsData& data, objArrayOop objarray_oop) : _data(data), _objarray_oop(objarray_oop) {}
+        oop _max_element;
+        oop _min_element;
+        Closure(ExCompressedFieldStatsData& data, objArrayOop objarray_oop)
+        : _data(data), _objarray_oop(objarray_oop), _max_element((oop)zaddress::null), _min_element((oop)zaddress::null) {}
         void do_oop(oop* obj) {
             // TODO: figure out accessors.
             oop element = HeapAccess<>::oop_load(obj);
+            if (_max_element == (oop)zaddress::null)
+                _max_element = element;
+            if (_min_element == (oop)zaddress::null)
+                _min_element = element;
+            if (element != (oop)zaddress::null) {
+                if (oopDesc::compare(element, _min_element) < 0) {
+                    _min_element = element;
+                } else if (oopDesc::compare(_max_element, element) < 0) {
+                    _max_element = element;
+                }
+            }
+            assert(oopDesc::compare(_min_element, _max_element) <= 0, "invariant");
             _data.ex_handle_field(_objarray_oop, element);
         }
         void do_oop(narrowOop* obj) {
@@ -221,6 +247,7 @@ void ExCompressedStatsData::ex_handle_object_objarrayklass(ZGenerationId id, uin
         }
     } closure(_field_data[(uint8_t)id].at(0), objarray_oop);
     objarray_oop->oop_iterate_range(&closure, 0, objarray_oop->length());
+    _field_data[(uint8_t)id].at(1).ex_handle_field(closure._min_element, closure._max_element);
 }
 
 void ExCompressedStatsData::ex_handle_object(ZGenerationId id, uint32_t seqnum, oop obj) {
@@ -270,11 +297,7 @@ void ExCompressedFieldStatsData::ex_handle_field(oop obj, oop field) {
         Atomic::inc(&_num_null);
         return;
     }
-    if (oopDesc::compare(obj, field) < 0) {
-       delta = pointer_delta(field, obj, MinObjAlignmentInBytes);
-    } else {
-       delta = pointer_delta(obj, field, MinObjAlignmentInBytes);
-    }
+    delta = pointer_delta_unord(obj, field);
     assert(delta < (std::numeric_limits<size_t>::max() >> 1), "should be true");
     // need one bit for direction
     delta = delta << 1;
@@ -290,7 +313,7 @@ void ExCompressedFieldStatsData::ex_handle_field(oop obj, oop field) {
                 break;
         } while (prev_min != load_min);
     }
-    size_t prev_max = Atomic::load(&_min);
+    size_t prev_max = Atomic::load(&_max);
     if (prev_max < delta) {
         size_t load_max = prev_max;
         do {
@@ -315,11 +338,36 @@ void ExCompressedStatsData::reset_data(ZGenerationId id) {
         _field_data[(uint8_t)id].at(i).reset_data();
     }
 }
+
+size_t ExCompressedFieldStatsData::get_num_worse() {
+    const auto log_sizeof_size_t = log2i_exact(sizeof(size_t));
+    return _max_num_worse_distribution >> log_sizeof_size_t;
+}
+
+size_t ExCompressedFieldStatsData::get_num_worse_byte_req() {
+    const auto log_sizeof_size_t = log2i_exact(sizeof(size_t));
+    const auto byte_bitmask = ~(~size_t(0) << log_sizeof_size_t);
+    return _max_num_worse_distribution & byte_bitmask;
+}
+
 void ExCompressedFieldStatsData::reset_data() {
     _min = std::numeric_limits<size_t>::max();
     _max = 0;
     _num_null = 0;
-    for (size_t i = 0; i < sizeof(size_t); ++i) {
+    const auto log_sizeof_size_t = log2i_exact(sizeof(size_t));
+    const auto byte_bitmask = ~(~size_t(0) << log_sizeof_size_t);
+    const auto last_max_num_worse_distribution = _max_num_worse_distribution >> log_sizeof_size_t;
+    const auto last_max_num_worse_distribution_byte = _max_num_worse_distribution & byte_bitmask;
+    assert(last_max_num_worse_distribution_byte < sizeof(size_t), "sanity");
+    for (size_t i = 0; i < last_max_num_worse_distribution_byte; ++i) {
+        _distribution[i] = 0;
+    }
+    for (size_t i = last_max_num_worse_distribution_byte; i < sizeof(size_t); ++i) {
+        if (_distribution[i] != 0 &&
+            (_distribution[i] > last_max_num_worse_distribution ||
+             i > last_max_num_worse_distribution_byte)) {
+            _max_num_worse_distribution = (_distribution[i] << log_sizeof_size_t) & i;
+        }
         _distribution[i] = 0;
     }
 }
@@ -385,19 +433,22 @@ void ExCompressedStatsData::evaluate(ZGenerationId id, uint32_t seqnum) {
                 if (field_data.get_max() > heap_cap[(uint8_t)id]) {
                     lt.print("    FarField: %10ld/%ld", field_data.get_max(), heap_cap[(uint8_t)id]);
                     auto dist = field_data.get_distribution();
-                    lt.print(" Distibution: [%6ld|%6ld|%6ld|%6ld|%6ld|%6ld|%6ld|%6ld|%6ld]",
+                    lt.print(" Distibution: [%6ld|%6ld|%6ld|%6ld|%6ld|%6ld|%6ld|%6ld|%6ld](%ld,%ld)",
                         field_data.get_num_null(),
-                        dist[0], dist[1], dist[2], dist[3], dist[4], dist[5], dist[6], dist[7]);
+                        dist[0], dist[1], dist[2], dist[3], dist[4], dist[5], dist[6], dist[7],
+                        field_data.get_min(), field_data.get_max());
                 } else if (lt_debug.is_enabled()) {
                     auto dist = field_data.get_distribution();
-                    lt_debug.print(" Distibution: [%6ld|%6ld|%6ld|%6ld|%6ld|%6ld|%6ld|%6ld|%6ld]",
+                    lt_debug.print(" Distibution: [%6ld|%6ld|%6ld|%6ld|%6ld|%6ld|%6ld|%6ld|%6ld](%ld,%ld)",
                         field_data.get_num_null(),
-                        dist[0], dist[1], dist[2], dist[3], dist[4], dist[5], dist[6], dist[7]);
+                        dist[0], dist[1], dist[2], dist[3], dist[4], dist[5], dist[6], dist[7],
+                        field_data.get_min(), field_data.get_max());
                 }
             }
         } else {
             assert(_klass->is_objArray_klass(), "invariant");
             auto& field_data = _field_data[(uint8_t)id].at(0);
+            auto& max_field_data = _field_data[(uint8_t)id].at(1);
             auto total = field_data.get_total_num();
             oak_savings[(uint8_t)id] += total * (sizeof(size_t) - ExCompressionHeuristics::get_max_bytes_per_reference());
             oak_redundant[(uint8_t)id] += total * (sizeof(size_t) - field_data.get_min_byte_req());
@@ -407,18 +458,30 @@ void ExCompressedStatsData::evaluate(ZGenerationId id, uint32_t seqnum) {
                 total,
                 _num_instances[(uint8_t)id],
                 _klass->name()->as_C_string());
-            assert(_field_data[(uint8_t)id].length() == 1, "sanity");
+            assert(_field_data[(uint8_t)id].length() == 2, "sanity");
             if (field_data.get_max() > heap_cap[(uint8_t)id]) {
                 lt.print("    FarArray: %10ld/%ld", field_data.get_max(), heap_cap[(uint8_t)id]);
                 auto dist = field_data.get_distribution();
-                lt.print(" Distibution: [%6ld|%6ld|%6ld|%6ld|%6ld|%6ld|%6ld|%6ld|%6ld]",
+                auto max_dist = max_field_data.get_distribution();
+                lt.print(" Distibution: [%6ld|%6ld|%6ld|%6ld|%6ld|%6ld|%6ld|%6ld|%6ld](%ld,%ld)",
                     field_data.get_num_null(),
-                    dist[0], dist[1], dist[2], dist[3], dist[4], dist[5], dist[6], dist[7]);
+                    dist[0], dist[1], dist[2], dist[3], dist[4], dist[5], dist[6], dist[7],
+                    field_data.get_min(), field_data.get_max());
+                lt.print("ElementDelta: [%6ld|%6ld|%6ld|%6ld|%6ld|%6ld|%6ld|%6ld|%6ld](%ld,%ld)",
+                    max_field_data.get_num_null(),
+                    max_dist[0], max_dist[1], max_dist[2], max_dist[3], max_dist[4], max_dist[5], max_dist[6], max_dist[7],
+                    max_field_data.get_min(), max_field_data.get_max());
             } else if (lt_debug.is_enabled()) {
                 auto dist = field_data.get_distribution();
-                lt_debug.print(" Distibution: [%6ld|%6ld|%6ld|%6ld|%6ld|%6ld|%6ld|%6ld|%6ld]",
+                auto max_dist = max_field_data.get_distribution();
+                lt_debug.print(" Distibution: [%6ld|%6ld|%6ld|%6ld|%6ld|%6ld|%6ld|%6ld|%6ld](%ld,%ld)",
                     field_data.get_num_null(),
-                    dist[0], dist[1], dist[2], dist[3], dist[4], dist[5], dist[6], dist[7]);
+                    dist[0], dist[1], dist[2], dist[3], dist[4], dist[5], dist[6], dist[7],
+                    field_data.get_min(), field_data.get_max());
+                lt_debug.print("ElementDelta: [%6ld|%6ld|%6ld|%6ld|%6ld|%6ld|%6ld|%6ld|%6ld](%ld,%ld)",
+                    max_field_data.get_num_null(),
+                    max_dist[0], max_dist[1], max_dist[2], max_dist[3], max_dist[4], max_dist[5], max_dist[6], max_dist[7],
+                    max_field_data.get_min(), max_field_data.get_max());
             }
         }
     }
