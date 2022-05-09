@@ -76,8 +76,8 @@ void ExCompressedStatsTable::evaluate_table(ZGenerationId id, uint32_t seqnum) {
     if (!ExUseDynamicCompressedOops)
         return;
     assert(_local_table != NULL, "Should have been created");
-    log_info(gc, coops)("%s: Evaluating ExCompressedStatsHashTable",
-            (id == ZGenerationId::young) ? "Young" : "Old");
+    log_info(gc, coops)("%s(%d): Evaluating ExCompressedStatsHashTable",
+            (id == ZGenerationId::young) ? "Young" : "Old", seqnum);
     auto func = [id, seqnum](ExCompressedStatsTableConfig::Value* value){
         (*value)->evaluate(id, seqnum);
         return true;
