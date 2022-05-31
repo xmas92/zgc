@@ -718,6 +718,10 @@ void ZGenerationYoung::mark_start() {
   // Increment sequence number
   _seqnum++;
 
+  if (ExVerifyAllStores) {
+    ExCompressedStatsTable::verify_mark_start(_id);
+  }
+
   // Enter mark phase
   set_phase(Phase::Mark);
 
@@ -756,6 +760,10 @@ bool ZGenerationYoung::mark_end() {
   // Update statistics
   stat_heap()->at_mark_end(_page_allocator->stats(this));
   ExCompressedStatsTable::evaluate_table(_id, _seqnum);
+
+  if (ExVerifyAllStores) {
+    ExCompressedStatsTable::verify_mark_end(_id);
+  }
 
   // Notify JVMTI that some tagmap entry objects may have died.
   JvmtiTagMap::set_needs_cleaning();
@@ -1044,6 +1052,10 @@ void ZGenerationOld::mark_start() {
   // Increment sequence number
   _seqnum++;
 
+  if (ExVerifyAllStores) {
+    ExCompressedStatsTable::verify_mark_start(_id);
+  }
+
   // Enter mark phase
   set_phase(Phase::Mark);
 
@@ -1082,6 +1094,10 @@ bool ZGenerationOld::mark_end() {
   // Update statistics
   stat_heap()->at_mark_end(_page_allocator->stats(this));
   ExCompressedStatsTable::evaluate_table(_id, _seqnum);
+
+  if (ExVerifyAllStores) {
+    ExCompressedStatsTable::verify_mark_end(_id);
+  }
 
   // Block resurrection of weak/phantom references
   ZResurrection::block();

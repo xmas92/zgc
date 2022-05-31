@@ -60,6 +60,86 @@ void ExCompressedStatsTable::register_mark_object(oop obj, ZGenerationId id) {
         Atomic::add(total_size_ptr, obj->size() * HeapWordSize, memory_order_relaxed);
     }
 }
+
+static volatile size_t allocating_page_store[2] = {0};
+
+
+static volatile size_t verify_array_max[2] = {0};
+static volatile size_t verify_array_next_index[2] = {0};
+static volatile size_t verify_array_num_stores[2] = {0};
+
+static GrowableArrayCHeap<ExVerifyStoreData,MEMFLAGS_VALUE> verify_array[2];
+
+
+void ExCompressedStatsTable::verify_init() {
+    Atomic::store(&verify_array_max[0], (size_t)0);
+    Atomic::store(&verify_array_max[1], (size_t)0);
+    Atomic::store(&verify_array_next_index[0], (size_t)0);
+    Atomic::store(&verify_array_next_index[1], (size_t)0);
+    Atomic::store(&verify_array_num_stores[0], (size_t)0);
+    Atomic::store(&verify_array_num_stores[1], (size_t)0);
+    log_info(gc, coops)("Init ExVerifyAllStores");
+}
+
+void ExCompressedStatsTable::register_allocating_page_store(ZGenerationId id) {
+    volatile size_t* allocating_page_store_ptr = allocating_page_store + (uint8_t)id;
+    Atomic::inc(allocating_page_store_ptr, memory_order_relaxed);
+}
+
+void ExCompressedStatsTable::verify_register_store(ZGenerationId id, size_t dst, size_t value) {
+    volatile size_t* verify_array_max_ptr = verify_array_max + (uint8_t)id;
+    volatile size_t* verify_array_next_index_ptr = verify_array_next_index + (uint8_t)id;
+    volatile size_t* verify_array_num_stores_ptr = verify_array_num_stores + (uint8_t)id;
+    auto& array = verify_array[(uint8_t)id];
+
+    size_t next_index = Atomic::fetch_and_add(verify_array_next_index_ptr, (size_t)1, memory_order_relaxed);
+    size_t max = Atomic::load(verify_array_max_ptr);
+    Atomic::inc(verify_array_num_stores_ptr, memory_order_relaxed);
+    if (next_index < max) {
+        array.at_put(next_index, ExVerifyStoreData(dst, value));
+    }
+}
+
+void ExCompressedStatsTable::verify_mark_start(ZGenerationId id) {
+    assert(SafepointSynchronize::is_at_safepoint(), "sanity");
+    volatile size_t* verify_array_max_ptr = verify_array_max + (uint8_t)id;
+    volatile size_t* verify_array_next_index_ptr = verify_array_next_index + (uint8_t)id;
+    volatile size_t* verify_array_num_stores_ptr = verify_array_num_stores + (uint8_t)id;
+    auto& array = verify_array[(uint8_t)id];
+    size_t max = Atomic::load_acquire(verify_array_max_ptr);
+    size_t num_stores = Atomic::load_acquire(verify_array_num_stores_ptr);
+    size_t num_stored = MIN2(max,num_stores);
+    assert(num_stored <= (size_t)array.length(), "sanity");
+    array.trunc_to(num_stored);
+    array.sort(ExVerifyStoreData::compare);
+}
+void ExCompressedStatsTable::verify_mark_end(ZGenerationId id) {
+    assert(SafepointSynchronize::is_at_safepoint(), "sanity");
+    volatile size_t* verify_array_max_ptr = verify_array_max + (uint8_t)id;
+    volatile size_t* verify_array_next_index_ptr = verify_array_next_index + (uint8_t)id;
+    volatile size_t* verify_array_num_stores_ptr = verify_array_num_stores + (uint8_t)id;
+    auto& array = verify_array[(uint8_t)id];
+    size_t max = Atomic::load_acquire(verify_array_max_ptr);
+    size_t num_stores = Atomic::load_acquire(verify_array_num_stores_ptr);
+    size_t new_max = MAX2(max,num_stores);
+    Atomic::release_store(verify_array_next_index_ptr, (size_t)0);
+    Atomic::release_store(verify_array_num_stores_ptr, (size_t)0);
+    array.clear();
+    if (new_max > 0) {
+        array.at_grow(new_max - 1);
+        new_max = array.max_length();
+        array.at_grow(new_max - 1);
+    }
+    Atomic::release_store(verify_array_max_ptr, new_max);
+    size_t array_size = array.data_size_in_bytes();
+    if (num_stores > max) {
+        log_info(gc, coops)("%s: Verify Missed %ld stores",
+                (id == ZGenerationId::young) ? "Young" : "Old", num_stores - max);
+    }
+    log_info(gc, coops)("%s:  Verify Array Size: %ld MB (%ld)",
+            (id == ZGenerationId::young) ? "Young" : "Old", array_size / M, array_size);
+}
+
 static volatile size_t _count = 0;
 void ExCompressedStatsTable::item_added() {
     Atomic::inc(&_count);
@@ -78,6 +158,32 @@ void ExCompressedStatsTable::evaluate_table(ZGenerationId id, uint32_t seqnum) {
     assert(_local_table != NULL, "Should have been created");
     log_info(gc, coops)("%s(%d): Evaluating ExCompressedStatsHashTable",
             (id == ZGenerationId::young) ? "Young" : "Old", seqnum);
+    if (ExVerifyAllStores && seqnum == 0) {
+        volatile size_t* allocating_page_store_ptr = allocating_page_store + (uint8_t)id;
+        size_t allocating_page_store = Atomic::load_acquire(allocating_page_store_ptr);
+        log_info(gc, coops)("%s(%d): allocating_page_store: %ld",
+                (id == ZGenerationId::young) ? "Young" : "Old", seqnum,
+                allocating_page_store);
+        Atomic::release_store(allocating_page_store_ptr, (size_t)0);
+    }
+    if (ExVerifyAllStores) {
+        auto& array = verify_array[(uint8_t)id];
+        ExCompressedFieldStatsData total_store_data;
+        auto dist = total_store_data.get_distribution();
+        for (int i = 0; i < array.length(); ++i) {
+            auto& store = array.at(i);
+            size_t delta = (store._dst < store._value) ?
+                store._value - store._dst :
+                store._dst - store._value;
+            total_store_data.ex_handle_delta(delta);
+        }
+        log_info(gc, coops)
+        ("%s(%d):   Total Stores: [%6ld|%6ld|%6ld|%6ld|%6ld|%6ld|%6ld|%6ld|%6ld](%ld,%ld)",
+            (id == ZGenerationId::young) ? "Young" : "Old", seqnum,
+            total_store_data.get_num_null(),
+            dist[0], dist[1], dist[2], dist[3], dist[4], dist[5], dist[6], dist[7],
+            total_store_data.get_min(), total_store_data.get_max());
+    }
     auto func = [id, seqnum](ExCompressedStatsTableConfig::Value* value){
         (*value)->evaluate(id, seqnum);
         return true;
@@ -178,9 +284,12 @@ ExCompressedStatsData::ExCompressedStatsData(Klass* klass)
                 num_fields++;
             }
         }
+        if (ExVerifyAllStores) {
+            num_fields *= 2;
+        }
         if (num_fields > 0) {
-            _field_data[0].at_grow(num_fields,ExCompressedFieldStatsData());
-            _field_data[1].at_grow(num_fields,ExCompressedFieldStatsData());
+            _field_data[0].at_grow(num_fields-1,ExCompressedFieldStatsData());
+            _field_data[1].at_grow(num_fields-1,ExCompressedFieldStatsData());
         }
     } else {
         assert(_klass->is_objArray_klass(), "invariant");
@@ -268,7 +377,15 @@ void ExCompressedStatsData::ex_handle_object_common(ZGenerationId id, oop obj, I
         if (!fs.access_flags().is_static() &&
                 is_reference_type(fs.field_descriptor().field_type())) {
             oop field = obj->obj_field(fs.offset());
-            _field_data[(uint8_t)id].at(i++).ex_handle_field(obj, field);
+            _field_data[(uint8_t)id].at(i).ex_handle_field(obj, field);
+            if (ExVerifyAllStores) {
+                auto len = _field_data[(uint8_t)id].length();
+                assert(len%2 == 0, "sanity");
+                assert(len/2 + i < len, "sanity");
+                oop* field_addr = obj->field_addr<oop>(fs.offset());
+                _field_data[(uint8_t)id].at(len/2 + i).ex_verify_field(obj, field_addr, id);
+            }
+            ++i;
         }
     }
 }
@@ -298,7 +415,11 @@ void ExCompressedFieldStatsData::ex_handle_field(oop obj, oop field) {
         return;
     }
     delta = pointer_delta_unord(obj, field);
-    assert(delta < (std::numeric_limits<size_t>::max() >> 1), "should be true");
+    ex_handle_delta(delta);
+}
+
+void ExCompressedFieldStatsData::ex_handle_delta(size_t delta) {
+     assert(delta < (std::numeric_limits<size_t>::max() >> 1), "should be true");
     // need one bit for direction
     delta = delta << 1;
 
@@ -330,6 +451,26 @@ void ExCompressedFieldStatsData::ex_handle_field(oop obj, oop field) {
     } while (delta != 0);
     assert(i >= 0 && i < 8, "sanity");
     Atomic::inc(_distribution + i);
+}
+
+void ExCompressedFieldStatsData::ex_verify_field(oop obj, oop* field_addr, ZGenerationId id) {
+    auto& array = verify_array[(uint8_t)id];
+    bool found = false;
+    int index = array.find_sorted<size_t,ExVerifyStoreData::compare>((size_t)field_addr, found);
+    if (!found) {
+        return;
+    }
+    auto& store = array.at(index);
+    while(ExVerifyStoreData::compare((size_t)field_addr, store) == 0) {
+        ex_handle_field(obj, to_oop((zaddress)store._value));
+        ++index;
+        if (index >= array.length()) {
+            break;
+        }
+        store = array.at(index);
+    }
+
+
 }
 
 void ExCompressedStatsData::reset_data(ZGenerationId id) {
@@ -429,17 +570,23 @@ void ExCompressedStatsData::evaluate(ZGenerationId id, uint32_t seqnum) {
                 _klass->name()->as_C_string());
             for (int i = 0; i < _field_data[(uint8_t)id].length(); ++i) {
                 auto& field_data = _field_data[(uint8_t)id].at(i);
+                if (!ExVerifyAllStores || i < _field_data[(uint8_t)id].length() / 2)
                 ik_redundant[(uint8_t)id] += (sizeof(size_t) - field_data.get_min_byte_req()) * _num_instances[(uint8_t)id];
+                auto log_text = (i >= _field_data[(uint8_t)id].length() / 2 && ExVerifyAllStores) ?
+                                " Store Dist" :
+                                "Distibution";
                 if (field_data.get_max() > heap_cap[(uint8_t)id]) {
                     lt.print("    FarField: %10ld/%ld", field_data.get_max(), heap_cap[(uint8_t)id]);
                     auto dist = field_data.get_distribution();
-                    lt.print(" Distibution: [%6ld|%6ld|%6ld|%6ld|%6ld|%6ld|%6ld|%6ld|%6ld](%ld,%ld)",
+                    lt.print(" %s: [%6ld|%6ld|%6ld|%6ld|%6ld|%6ld|%6ld|%6ld|%6ld](%ld,%ld)",
+                        log_text,
                         field_data.get_num_null(),
                         dist[0], dist[1], dist[2], dist[3], dist[4], dist[5], dist[6], dist[7],
                         field_data.get_min(), field_data.get_max());
                 } else if (lt_debug.is_enabled()) {
                     auto dist = field_data.get_distribution();
-                    lt_debug.print(" Distibution: [%6ld|%6ld|%6ld|%6ld|%6ld|%6ld|%6ld|%6ld|%6ld](%ld,%ld)",
+                    lt_debug.print(" %s: [%6ld|%6ld|%6ld|%6ld|%6ld|%6ld|%6ld|%6ld|%6ld](%ld,%ld)",
+                        log_text,
                         field_data.get_num_null(),
                         dist[0], dist[1], dist[2], dist[3], dist[4], dist[5], dist[6], dist[7],
                         field_data.get_min(), field_data.get_max());

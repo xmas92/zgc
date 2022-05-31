@@ -95,6 +95,9 @@ inline void ExCompressionHeuristics::initialize() {
         log_info(gc,coops)("Max Delta in Heap: %ld M", get_max_address_size_delta() / M);
         log_info(gc,coops)("Assumed Max Bytes: %ld B / Reference", get_max_bytes_per_reference());
         ExCompressedStatsTable::create_table();
+        if (ExVerifyAllStores) {
+            ExCompressedStatsTable::verify_init();
+        }
     }
 }
 
@@ -119,6 +122,21 @@ inline void ExCompressionHeuristics::handle_create_objarray_class(ObjArrayKlass*
     }
     oak->set_compressed_stats_data_entry(ExCompressedStatsTable::new_entry(oak));
     oak->compressed_stats_data_entry()->initial_compression_status(ExCompressedStatsData::CompressEvaluate);
+}
+
+inline void ExCompressionHeuristics::ex_verify_store(zaddress src, zpointer* dst) {
+    if (src != zaddress::null) {
+        // zaddress dst_addr = ZBarrier::load_barrier_on_oop_field(dst);
+        ZPage* page = ZHeap::heap()->page(dst);
+        if (page == NULL) {
+            return;
+        }
+        ZGeneration* generation = ZGeneration::generation(page->generation_id());
+        if (generation->is_phase_mark()) {
+            return;
+        }
+        ExCompressedStatsTable::verify_register_store(generation->id(), (size_t)dst, (size_t)src);
+    }
 }
 
 #endif // SHARE_GC_Z_EXCOMPRESSEDSTATSTABLE_INLINE_HPP

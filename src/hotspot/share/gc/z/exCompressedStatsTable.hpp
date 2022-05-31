@@ -7,10 +7,30 @@
 #include "memory/allocation.hpp"
 #include "gc/z/zGenerationId.hpp"
 #include "oops/instanceKlass.hpp"
+#include "gc/z/zAddress.inline.hpp"
 
 
 auto const MEMFLAGS_VALUE = mtInternal;
 class ExCompressedStatsData;
+
+class ExVerifyStoreData : public CHeapObj<MEMFLAGS_VALUE> {
+public:
+    size_t _dst;
+    size_t _value;
+    ExVerifyStoreData() : _dst(0), _value(0) {}
+    ExVerifyStoreData(size_t dst, size_t value) : _dst(dst), _value(value) {}
+
+    static int compare(ExVerifyStoreData* a, ExVerifyStoreData* b) {
+        if (a->_dst < b->_dst) return -1;
+        if (a->_dst > b->_dst) return 1;
+        return 0;
+    }
+    static int compare(const size_t& a, const ExVerifyStoreData& b) {
+        if (a < b._dst) return -1;
+        if (a > b._dst) return 1;
+        return 0;
+    }
+};
 
 class ExCompressedStatsTable : public CHeapObj<MEMFLAGS_VALUE> {
     friend class ExCompressedStatsTableConfig;
@@ -28,6 +48,12 @@ public:
     static void evaluate_table(ZGenerationId id, uint32_t seqnum);
 
     static void register_mark_object(oop obj, ZGenerationId id);
+
+    static void register_allocating_page_store(ZGenerationId id);
+    static void verify_mark_start(ZGenerationId id);
+    static void verify_mark_end(ZGenerationId id);
+    static void verify_register_store(ZGenerationId id, size_t dst, size_t value);
+    static void verify_init();
 };
 
 class ExCompressedFieldStatsData : public CHeapObj<MEMFLAGS_VALUE> {
@@ -48,6 +74,10 @@ public:
     size_t get_min_byte_req();
     void ex_handle_field(oop obj, oop field);
     void reset_data();
+
+    void ex_verify_field(oop obj, oop* field_addr, ZGenerationId id);
+
+    void ex_handle_delta(size_t delta);
 };
 
 class ExCompressedStatsData : public CHeapObj<MEMFLAGS_VALUE> {
@@ -84,6 +114,11 @@ public:
         _status[0] = _status[1] = status;
     }
 
+
+    // void ex_verify_object(ZGenerationId id, oop obj, zaddress field, zaddress store);
+    // void ex_verify_object_field(ZGenerationId id, oop obj, zaddress field, zaddress store, InstanceKlass* ik);
+    // void ex_verify_object_element(ZGenerationId id, oop obj, zaddress element, zaddress store, ObjArrayKlass* oak);
+
 private:
     void ex_handle_object_common(ZGenerationId id, oop obj, InstanceKlass* ik);
     void ex_handle_seqnum(ZGenerationId id, uint32_t seqnum);
@@ -105,6 +140,8 @@ public:
     static inline void handle_create_objarray_class(ObjArrayKlass* oak);
     static inline void handle_mark_object(oop obj, ZGenerationId id, uint32_t seqnum);
     static inline void initialize();
+
+    static inline void ex_verify_store(zaddress src, zpointer* dst);
 
     static size_t get_max_address_size();
     static size_t get_max_address_size_delta();

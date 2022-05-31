@@ -40,6 +40,7 @@ private:
   static void store_barrier_on_oop_field_with_healing(oop* p);
   static void store_barrier_on_oop_field_without_healing(oop* p);
   static void clone(oopDesc* src, oopDesc* dst, size_t size);
+  static void verify_log(zaddress src, zpointer* dst);
 
 public:
   static address load_barrier_on_oop_field_preloaded_addr(DecoratorSet decorators);
@@ -51,6 +52,7 @@ public:
   static address store_barrier_on_oop_field_with_healing_addr();
   static address store_barrier_on_oop_field_without_healing_addr();
   static address clone_addr();
+  static address verify_log_addr();
 };
 
 #endif // SHARE_GC_Z_ZBARRIERSETRUNTIME_HPP

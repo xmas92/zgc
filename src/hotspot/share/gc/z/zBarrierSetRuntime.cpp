@@ -26,6 +26,7 @@
 #include "gc/z/zBarrierSetRuntime.hpp"
 #include "oops/access.hpp"
 #include "runtime/interfaceSupport.inline.hpp"
+#include "gc/z/exCompressedStatsTable.inline.hpp"
 
 JRT_LEAF(oopDesc*, ZBarrierSetRuntime::load_barrier_on_oop_field_preloaded(oopDesc* o, oop* p))
   return to_oop(ZBarrier::load_barrier_on_oop_field_preloaded((zpointer*)p, to_zpointer(o)));
@@ -57,6 +58,10 @@ JRT_END
 
 JRT_LEAF(void, ZBarrierSetRuntime::clone(oopDesc* src, oopDesc* dst, size_t size))
   HeapAccess<>::clone(src, dst, size);
+JRT_END
+
+JRT_LEAF(void, ZBarrierSetRuntime::verify_log(zaddress src, zpointer* dst))
+  ExCompressionHeuristics::ex_verify_store(src, dst);
 JRT_END
 
 address ZBarrierSetRuntime::load_barrier_on_oop_field_preloaded_addr(DecoratorSet decorators) {
@@ -108,6 +113,10 @@ address ZBarrierSetRuntime::store_barrier_on_oop_field_with_healing_addr() {
 
 address ZBarrierSetRuntime::store_barrier_on_oop_field_without_healing_addr() {
   return reinterpret_cast<address>(store_barrier_on_oop_field_without_healing);
+}
+
+address ZBarrierSetRuntime::verify_log_addr() {
+  return reinterpret_cast<address>(verify_log);
 }
 
 address ZBarrierSetRuntime::clone_addr() {
