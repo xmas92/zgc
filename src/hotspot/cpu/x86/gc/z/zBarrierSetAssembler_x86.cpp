@@ -390,6 +390,15 @@ void ZBarrierSetAssembler::store_barrier_fast(MacroAssembler* masm,
   assert_different_registers(ref_addr.index(), rnew_zpointer);
   assert_different_registers(rnew_zaddress, rnew_zpointer);
 
+  if (ExUseDynamicCompressedOops && ExVerifyAllStores) {
+    if (rnew_zaddress != noreg) {
+      ZRuntimeCallSpill rcs(masm, noreg);
+      __ mov(c_rarg0, rnew_zaddress);
+      __ leaq(c_rarg1, ref_addr);
+      __ MacroAssembler::call_VM_leaf(ZBarrierSetRuntime::verify_log_addr(), 2);
+    }
+  }
+
   if (in_nmethod) {
     if (is_c2_compilation()) {
       emit_store_fast_path_check_c2(masm, ref_addr, is_atomic, medium_path);
@@ -560,14 +569,7 @@ void ZBarrierSetAssembler::store_at(MacroAssembler* masm,
       __ bind(done);
     }
 
-  if (ExUseDynamicCompressedOops && ExVerifyAllStores && (decorators & IN_HEAP) && (type == T_OBJECT || type == T_ARRAY)) {
-    if (src != noreg) {
-      ZRuntimeCallSpill rcs(masm, noreg);
-      __ mov(c_rarg0, src);
-      __ leaq(c_rarg1, dst);
-      __ MacroAssembler::call_VM_leaf(ZBarrierSetRuntime::verify_log_addr(), 2);
-    }
-  }
+
 
     // Store value
     BarrierSetAssembler::store_at(masm, decorators, type, dst, tmp1, noreg, noreg, noreg);
