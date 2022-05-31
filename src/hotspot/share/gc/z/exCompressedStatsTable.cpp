@@ -72,8 +72,14 @@ static GrowableArrayCHeap<ExVerifyStoreData,MEMFLAGS_VALUE> verify_array[2];
 
 
 void ExCompressedStatsTable::verify_init() {
-    Atomic::store(&verify_array_max[0], (size_t)0);
-    Atomic::store(&verify_array_max[1], (size_t)0);
+    size_t start_size = 4 * M;
+
+    verify_array[0].at_grow(start_size - 1);
+    verify_array[1].at_grow(start_size - 1);
+    verify_array[0].clear();
+    verify_array[1].clear();
+    Atomic::store(&verify_array_max[0], (size_t)verify_array[0].max_length());
+    Atomic::store(&verify_array_max[1], (size_t)verify_array[1].max_length());
     Atomic::store(&verify_array_next_index[0], (size_t)0);
     Atomic::store(&verify_array_next_index[1], (size_t)0);
     Atomic::store(&verify_array_num_stores[0], (size_t)0);
