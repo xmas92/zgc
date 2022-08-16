@@ -199,6 +199,8 @@ public:
 
   void* remset_current();
 
+  void install_arm_value();
+
   zaddress alloc_object(size_t size);
   zaddress alloc_object_atomic(size_t size);
 

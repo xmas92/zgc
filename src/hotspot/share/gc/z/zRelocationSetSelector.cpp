@@ -125,6 +125,7 @@ void ZRelocationSetSelectorGroup::select_inner() {
   for (int from = 1; from <= npages; from++) {
     // Add page to the candidate relocation set
     ZPage* const page = _live_pages.at(from - 1);
+    page->install_arm_value();
     const size_t page_live_bytes = page->live_bytes();
     from_live_bytes += page_live_bytes;
     from_forwarding_entries += ZForwarding::nentries(page);
@@ -189,6 +190,7 @@ void ZRelocationSetSelectorGroup::select() {
     const int npages = _live_pages.length();
     for (int from = 1; from <= npages; from++) {
       ZPage* const page = _live_pages.at(from - 1);
+      page->install_arm_value();
       _not_selected_pages.append(page);
     }
   }

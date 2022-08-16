@@ -593,6 +593,7 @@ public:
 
 void ZGenerationYoung::flip_mark_start() {
   ZGlobalsPointers::flip_young_mark_start();
+  ZPageArmTable::flip_young_mark_start();
   ZBarrierSet::assembler()->patch_barriers();
 }
 

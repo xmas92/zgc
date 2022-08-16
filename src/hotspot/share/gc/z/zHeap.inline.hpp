@@ -32,6 +32,7 @@
 #include "gc/z/zHash.inline.hpp"
 #include "gc/z/zMark.inline.hpp"
 #include "gc/z/zPage.inline.hpp"
+#include "gc/z/zPageArmTable.inline.hpp"
 #include "gc/z/zPageTable.inline.hpp"
 #include "gc/z/zRemembered.inline.hpp"
 #include "utilities/debug.hpp"
@@ -50,8 +51,9 @@ inline bool ZHeap::is_young(zaddress addr) const {
   return page(addr)->is_young();
 }
 
-inline bool ZHeap::is_young(volatile zpointer* ptr) const {
-  return page(ptr)->is_young();
+inline bool ZHeap::is_young(volatile zpointer* p) const {
+  assert(is_in((uintptr_t)p), "Not in heap");
+  return is_young(to_zaddress((uintptr_t)p));
 }
 
 inline bool ZHeap::is_old(zaddress addr) const {
