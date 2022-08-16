@@ -25,6 +25,7 @@
 #include "gc/z/zGeneration.inline.hpp"
 #include "gc/z/zList.inline.hpp"
 #include "gc/z/zPage.inline.hpp"
+#include "gc/z/zPageArmTable.hpp"
 #include "gc/z/zPhysicalMemory.inline.hpp"
 #include "gc/z/zRememberedSet.inline.hpp"
 #include "gc/z/zVirtualMemory.inline.hpp"
@@ -54,6 +55,8 @@ ZPage::ZPage(ZPageType type, const ZVirtualMemory& vmem, const ZPhysicalMemory& 
          (_type == ZPageType::medium && size() == ZPageSizeMedium) ||
          (_type == ZPageType::large && is_aligned(size(), ZGranuleSize)),
          "Page type/size mismatch");
+
+  install_arm_value();
 }
 
 ZPage::~ZPage() {}
@@ -149,6 +152,10 @@ void ZPage::reset_remembered_set(ZPageAge prev_age, ZPageResetType type) {
   };
 }
 
+void ZPage::install_arm_value() {
+  ZPageArmTable::set(this, is_old() ? int8_t(ZPageArmOld) : ZPageArmGoodMask);
+}
+
 void ZPage::reset(ZPageAge age, ZPageResetType type) {
   ZPageAge prev_age = _age;
   _age = age;
@@ -172,6 +179,8 @@ void ZPage::reset(ZPageAge age, ZPageResetType type) {
     // because they clone the page.
     _livemap.reset();
   }
+
+  install_arm_value();
 }
 
 void ZPage::finalize_reset_for_in_place_relocation() {
@@ -183,6 +192,7 @@ void ZPage::reset_type_and_size(ZPageType type) {
   _type = type;
   _livemap.resize(object_max_count());
   _remembered_set.resize(size());
+  install_arm_value();
 }
 
 ZPage* ZPage::retype(ZPageType type) {

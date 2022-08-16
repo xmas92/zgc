@@ -60,6 +60,9 @@
   product(bool, ZUncommit, true,                                            \
           "Uncommit unused memory")                                         \
                                                                             \
+  product(bool, ZArmPages, true, DIAGNOSTIC,                                \
+          "Arm pages")                                                      \
+                                                                            \
   product(bool, ZBufferStoreBarriers, true, DIAGNOSTIC,                     \
           "Buffer store barriers")                                          \
                                                                             \

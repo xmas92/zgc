@@ -26,6 +26,8 @@
 #include "gc/z/zAddress.inline.hpp"
 #include "gc/z/zBarrier.inline.hpp"
 #include "gc/z/zGeneration.inline.hpp"
+#include "gc/z/zHeap.inline.hpp"
+#include "gc/z/zPageArmTable.hpp"
 #include "gc/z/zStoreBarrierBuffer.inline.hpp"
 #include "gc/z/zUncoloredRoot.inline.hpp"
 #include "runtime/threadSMR.hpp"

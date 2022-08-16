@@ -27,6 +27,7 @@
 #include "gc/z/zBarrier.inline.hpp"
 #include "gc/z/zGeneration.inline.hpp"
 #include "gc/z/zHeap.inline.hpp"
+#include "gc/z/zPageArmTable.inline.hpp"
 #include "gc/z/zStoreBarrierBuffer.inline.hpp"
 #include "memory/iterator.inline.hpp"
 #include "oops/oop.inline.hpp"

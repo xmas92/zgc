@@ -26,6 +26,7 @@
 #include "gc/z/zAddress.inline.hpp"
 #include "gc/z/zAddressSpaceLimit.hpp"
 #include "gc/z/zGlobals.hpp"
+#include "gc/z/zPageArmTable.hpp"
 #include "gc/z/zVirtualMemory.inline.hpp"
 #include "services/memTracker.hpp"
 #include "utilities/align.hpp"
@@ -134,6 +135,8 @@ bool ZVirtualMemoryManager::reserve_contiguous(size_t size) {
 }
 
 bool ZVirtualMemoryManager::reserve(size_t max_capacity) {
+  ZPageArmTable::initialize();
+
   const size_t limit = MIN2(ZAddressOffsetMax, ZAddressSpaceLimit::heap());
   const size_t size = MIN2(max_capacity * ZVirtualToPhysicalRatio, limit);
 

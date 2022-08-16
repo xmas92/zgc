@@ -56,6 +56,7 @@ const int ZBarrierRelocationFormatStoreGoodAfterCmp = 3;
 const int ZBarrierRelocationFormatStoreBadAfterTest = 4;
 const int ZBarrierRelocationFormatStoreGoodAfterOr  = 5;
 const int ZBarrierRelocationFormatStoreGoodAfterMov = 6;
+const int ZBarrierRelocationFormatPageArmAfterTest  = 7;
 
 class ZBarrierSetAssembler : public ZBarrierSetAssemblerBase {
 private:
@@ -169,6 +170,7 @@ public:
   void store_barrier_medium(MacroAssembler* masm,
                             Address ref_addr,
                             Register tmp,
+                            bool in_nmethod,
                             bool is_native,
                             bool is_atomic,
                             Label& medium_path_continuation,

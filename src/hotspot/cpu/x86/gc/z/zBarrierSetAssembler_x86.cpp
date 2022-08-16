@@ -30,6 +30,7 @@
 #include "gc/z/zBarrierSet.hpp"
 #include "gc/z/zBarrierSetAssembler.hpp"
 #include "gc/z/zBarrierSetRuntime.hpp"
+#include "gc/z/zPageArmTable.inline.hpp"
 #include "gc/z/zThreadLocalData.hpp"
 #include "memory/resourceArea.hpp"
 #include "runtime/jniHandles.hpp"
@@ -383,6 +384,54 @@ static void emit_store_fast_path_check_c2(MacroAssembler* masm, Address ref_addr
 #endif
 }
 
+static void emit_store_fast_path_check_page(MacroAssembler* masm, Address ref_addr, Register rnew_zpointer, Label& medium_path) {
+  __ testb(Address(rnew_zpointer, ZPageArmTable::table_bias()), barrier_Relocation::unpatched);
+  __ relocate(barrier_Relocation::spec(), ZBarrierRelocationFormatPageArmAfterTest);
+  __ jcc(Assembler::notZero, medium_path);
+}
+
+static int store_fast_path_check_size_page(MacroAssembler* masm, Address ref_addr, Register rnew_zpointer, Label& medium_path) {
+  if (!VM_Version::has_intel_jcc_erratum()) {
+    return 0;
+  }
+  int size = 0;
+#ifdef COMPILER2
+  bool in_scratch_emit_size = masm->code_section()->scratch_emit();
+  if (!in_scratch_emit_size) {
+    // Temporarily register as scratch buffer so that relocations don't register
+    masm->code_section()->set_scratch_emit(true);
+  }
+  // First emit the code, to measure its size
+  address insts_end = masm->code_section()->end();
+  // The dummy medium path label is bound after the code emission. This ensures
+  // full size of the generated jcc, which is what the real barrier will have
+  // as well, as it also binds after the emission of the barrier.
+  Label dummy_medium_path;
+  emit_store_fast_path_check_page(masm, ref_addr, rnew_zpointer, dummy_medium_path);
+  address emitted_end = masm->code_section()->end();
+  size = (int)(intptr_t)(emitted_end - insts_end);
+  __ bind(dummy_medium_path);
+  if (!in_scratch_emit_size) {
+    // Potentially restore scratchyness
+    masm->code_section()->set_scratch_emit(false);
+  }
+  // Roll back code, now that we know the size
+  masm->code_section()->set_end(insts_end);
+#endif
+  return size;
+}
+
+static void emit_store_fast_path_check_c2_page(MacroAssembler* masm, Address ref_addr, Register rnew_zpointer, Label& medium_path) {
+#ifdef COMPILER2
+  // This is a JCC erratum mitigation wrapper for calling the inner check
+  int size = store_fast_path_check_size_page(masm, ref_addr, rnew_zpointer, medium_path);
+  // Emit JCC erratum mitigation nops with the right size
+  IntelJccErratumAlignment(*masm, size);
+  // Emit the JCC erratum mitigation guarded code
+  emit_store_fast_path_check_page(masm, ref_addr, rnew_zpointer, medium_path);
+#endif
+}
+
 static bool is_c2_compilation() {
   CompileTask* task = ciEnv::current()->task();
   return task != NULL && is_c2_compile(task->comp_level());
@@ -401,10 +450,26 @@ void ZBarrierSetAssembler::store_barrier_fast(MacroAssembler* masm,
   assert_different_registers(rnew_zaddress, rnew_zpointer);
 
   if (in_nmethod) {
-    if (is_c2_compilation()) {
-      emit_store_fast_path_check_c2(masm, ref_addr, is_atomic, medium_path);
+    if (!is_atomic && ZArmPages) {
+      // Check if page is "armed". Only armed pages need pre-load barrier. In some
+      // workloads, it might be more caching friendly to load from the table instead
+      // of from the field, as one 64 byte cache line worth of table covers 128M worth
+      // of virtual address space. With reasonable locality, misses should be rare.
+      // This filter is however optional. Pages subject to marking are "armed" and old
+      __ movptr(rnew_zpointer, ref_addr.base());
+      __ shrq(rnew_zpointer, ZPageArmTable::addr_shift());
+      guarantee(ZPageArmTable::table_bias() < INT_MAX, "must be");
+      if (is_c2_compilation()) {
+        emit_store_fast_path_check_c2_page(masm, ref_addr, rnew_zpointer, medium_path);
+      } else {
+        emit_store_fast_path_check_page(masm, ref_addr, rnew_zpointer, medium_path);
+      }
     } else {
-      emit_store_fast_path_check(masm, ref_addr, is_atomic, medium_path);
+      if (is_c2_compilation()) {
+        emit_store_fast_path_check_c2(masm, ref_addr, is_atomic, medium_path);
+      } else {
+        emit_store_fast_path_check(masm, ref_addr, is_atomic, medium_path);
+      }
     }
     __ bind(medium_path_continuation);
     if (rnew_zaddress != noreg) {
@@ -471,6 +536,7 @@ static void store_barrier_buffer_add(MacroAssembler* masm,
 void ZBarrierSetAssembler::store_barrier_medium(MacroAssembler* masm,
                                                 Address ref_addr,
                                                 Register tmp,
+                                                bool in_nmethod,
                                                 bool is_native,
                                                 bool is_atomic,
                                                 Label& medium_path_continuation,
@@ -512,6 +578,16 @@ void ZBarrierSetAssembler::store_barrier_medium(MacroAssembler* masm,
     __ bind(slow_path_continuation);
     __ jmp(medium_path_continuation);
   } else {
+    if (in_nmethod && ZArmPages) {
+      Label medium_path;
+      if (is_c2_compilation()) {
+        emit_store_fast_path_check_c2(masm, ref_addr, is_atomic, medium_path);
+      } else {
+        emit_store_fast_path_check(masm, ref_addr, is_atomic, medium_path);
+      }
+      __ jmp(medium_path_continuation);
+      __ bind(medium_path);
+    }
     // A non-atomic relocatable object won't get to the medium fast path due to a
     // raw NULL in the young generation. We only get here because the field is bad.
     // In this path we don't need any self healing, so we can avoid a runtime call
@@ -564,6 +640,7 @@ void ZBarrierSetAssembler::store_at(MacroAssembler* masm,
       store_barrier_medium(masm,
                            dst,
                            tmp1,
+                           false /* in_nmethod */,
                            false /* is_native */,
                            false /* is_atomic */,
                            medium_continuation,
@@ -1006,6 +1083,7 @@ void ZBarrierSetAssembler::generate_c1_store_barrier_stub(LIR_Assembler* ce,
   store_barrier_medium(ce->masm(),
                        ce->as_Address(stub->ref_addr()->as_address_ptr()),
                        rscratch1,
+                       true /* in_nmethod */,
                        false /* is_native */,
                        stub->is_atomic(),
                        *stub->continuation(),
@@ -1444,6 +1522,7 @@ void ZBarrierSetAssembler::generate_c2_store_barrier_stub(MacroAssembler* masm, 
   store_barrier_medium(masm,
                        stub->ref_addr(),
                        stub->new_zpointer(),
+                       true /* in_nmethod */,
                        stub->is_native(),
                        stub->is_atomic(),
                        *stub->continuation(),
@@ -1487,6 +1566,9 @@ static int patch_barrier_relocation_offset(int format) {
   case ZBarrierRelocationFormatStoreGoodAfterMov:
     return -3;
 
+  case ZBarrierRelocationFormatPageArmAfterTest:
+    return -1;
+
   default:
     ShouldNotReachHere();
     return 0;
@@ -1512,6 +1594,9 @@ static uint16_t patch_barrier_relocation_value(int format) {
   case ZBarrierRelocationFormatStoreBadAfterTest:
     return (uint16_t)ZPointerStoreBadMask;
 
+  case ZBarrierRelocationFormatPageArmAfterTest:
+    return (uint16_t)ZPageArmBadMask;
+
   default:
     ShouldNotReachHere();
     return 0;
@@ -1522,7 +1607,8 @@ void ZBarrierSetAssembler::patch_barrier_relocation(address addr, int format) {
   const int offset = patch_barrier_relocation_offset(format);
   const uint16_t value = patch_barrier_relocation_value(format);
   uint8_t* const patch_addr = (uint8_t*)addr + offset;
-  if (format == ZBarrierRelocationFormatLoadGoodBeforeShl) {
+  if (format == ZBarrierRelocationFormatLoadGoodBeforeShl ||
+      format == ZBarrierRelocationFormatPageArmAfterTest) {
     *patch_addr = (uint8_t)value;
   } else {
     *(uint16_t*)patch_addr = value;
