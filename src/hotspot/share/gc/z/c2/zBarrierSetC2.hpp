@@ -46,7 +46,6 @@ protected:
   const MachNode* _node;
   Label           _entry;
   Label           _continuation;
-  Label           _label_for_get_size;
 
 static void register_stub(ZBarrierStubC2* stub);
 static void inc_trampoline_stubs_count();

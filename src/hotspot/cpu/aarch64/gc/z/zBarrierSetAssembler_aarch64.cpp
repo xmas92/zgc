@@ -1274,7 +1274,9 @@ void ZBarrierSetAssembler::generate_c2_load_barrier_stub(MacroAssembler* masm, Z
   BLOCK_COMMENT("ZLoadBarrierStubC2");
 
   // Stub entry
-  __ bind(*stub->entry());
+  if (!Compile::current()->output()->in_scratch_emit_size()) {
+    __ bind(*stub->entry());
+  }
 
   {
     ZSaveLiveRegisters save_live_registers(masm, stub);
