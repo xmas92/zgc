@@ -197,6 +197,62 @@ public:
 
 #ifdef COMPILER2
 
+// Load barriers on aarch64 are implemented with a test-and-branch immediate instruction.
+// This immediate has a max delta of 32K. Because of this the branch is implemented with
+// a small jump, as follows:
+//      __ tbz(ref, barrier_Relocation::unpatched, good);
+//      __ b(*stub->entry());
+//      __ bind(good);
+//
+// If we can guarantee that the *stub->entry() label is within 32K we can replace the above
+// code with:
+//      __ tbnz(ref, barrier_Relocation::unpatched, *stub->entry());
+//
+// From the branch shortening part of PhaseOutput we get a pessimistic code size that the code
+// will not grow beyond.
+//
+// The algorithm for emitting the load barrier branches and stubs now have three versions
+// depending on the distance between the barrier and the stub.
+// Version 1: Not Reachable with a test-and-branch immediate
+// Version 2: Reachable with a test-and-branch immediate via trampoline
+// Version 3: Reachable with a test-and-branch immediate without trampoline
+//
+//     +--------------------- Code ----------------------+
+//     |                      ***                        |
+//     | b(stub1)                                        | (Version 1)
+//     |                      ***                        |
+//     | tbnz(ref, barrier_Relocation::unpatched, tramp) | (Version 2)
+//     |                      ***                        |
+//     | tbnz(ref, barrier_Relocation::unpatched, stub3) | (Version 3)
+//     |                      ***                        |
+//     +--------------------- Stub ----------------------+
+//     | tramp: b(stub2)                                 | (Trampoline slot)
+//     | stub3:                                          |
+//     |                  * Stub Code*                   |
+//     | stub1:                                          |
+//     |                  * Stub Code*                   |
+//     | stub2:                                          |
+//     |                  * Stub Code*                   |
+//     +-------------------------------------------------+
+//
+//  Version 1: Is emitted if the pessimistic distance between the branch instruction and the current
+//             trampoline slot cannot fit in a test and branch immediate.
+//
+//  Version 2: Is emitted if the pessimistic distance between the branch instruction and the current
+//             trampoline slot can fit in a test and branch immediate. But we cannot guarantee that
+//             the next branch can reach the next trampoline slot if we emitted the current stub
+//             directly.
+//
+//  Version 2: Is emitted if the pessimistic distance between the branch instruction and the current
+//             trampoline slot can fit in a test and branch immediate. And we can guarantee that the
+//             next branch can reach the next trampoline slot if we emit this stub directly, skipping
+//             the trampoline.
+//
+//  While emitting load barriers the current trampoline slot is the stub section start + NativeInstruction::instruction_size
+//  While emitting stubs the current trampoline slot is always where the next instruction would be emitted.
+
+//  Selection between 1 and 2/3, that is between branch and test-and-branch, is done when emitting the load
+//  barrier and selecting between 2 and 3 is done when emitting stubs, preferring 3 whenever possible.
 class ZLoadBarrierStubC2Aarch64 : public ZLoadBarrierStubC2 {
 private:
   Label _trampoline_entry;
