@@ -1345,19 +1345,31 @@ bool aarch64_test_and_branch_reachable(int offset_code, int offset_stubs, int co
 
 ZLoadBarrierStubC2Aarch64::ZLoadBarrierStubC2Aarch64(const MachNode* node, Address ref_addr, Register ref, int offset)
   : ZLoadBarrierStubC2(node, ref_addr, ref), _trampoline_entry(), _offset(offset), _first_emit(true), _test_and_branch_reachable(false) {
-    PhaseOutput* const output = Compile::current()->output();
-    if (output->in_scratch_emit_size()) {
-      return;
-    }
-    const int code_size = output->buffer_sizing_data()->_code;
-    const int offset_code = _offset;
-    // TODO: Check that branch is always NativeInstruction::instruction_size bytes. REF: MacroAssembler::far_codestub_branch_size()
-    const int trampoline_offset = trampoline_stubs_count() * NativeInstruction::instruction_size;
-    _test_and_branch_reachable = aarch64_test_and_branch_reachable(offset_code, trampoline_offset, code_size);
-    if (_test_and_branch_reachable) {
-      inc_trampoline_stubs_count();
-    }
+  PhaseOutput* const output = Compile::current()->output();
+  if (output->in_scratch_emit_size()) {
+    return;
   }
+  const int code_size = output->buffer_sizing_data()->_code;
+  const int offset_code = _offset;
+  // TODO: Check that branch is always NativeInstruction::instruction_size bytes. REF: MacroAssembler::far_codestub_branch_size()
+  const int trampoline_offset = trampoline_stubs_count() * NativeInstruction::instruction_size;
+  _test_and_branch_reachable = aarch64_test_and_branch_reachable(offset_code, trampoline_offset, code_size);
+  if (_test_and_branch_reachable) {
+    inc_trampoline_stubs_count();
+  }
+}
+
+int ZLoadBarrierStubC2Aarch64::get_stub_size() {
+  PhaseOutput* const output = Compile::current()->output();
+  assert(!output->in_scratch_emit_size(), "only used when emitting stubs");
+  BufferBlob* const blob = output->scratch_buffer_blob();
+  CodeBuffer cb(blob->content_begin(), (address)output->scratch_locs_memory() - blob->content_begin());
+  MacroAssembler masm(&cb);
+  output->set_in_scratch_emit_size(true);
+  ZLoadBarrierStubC2::emit_code(masm);
+  output->set_in_scratch_emit_size(false);
+  return cb.insts_size();
+}
 
 ZLoadBarrierStubC2Aarch64* ZLoadBarrierStubC2Aarch64::create(const MachNode* node, Address ref_addr, Register ref, int offset) {
   ZLoadBarrierStubC2Aarch64* const stub = new (Compile::current()->comp_arena()) ZLoadBarrierStubC2Aarch64(node, ref_addr, ref, offset);
@@ -1392,8 +1404,7 @@ void ZLoadBarrierStubC2Aarch64::emit_code(MacroAssembler& masm) {
   assert(stubs_start_offset() <= code_size, "stubs are assumed to be emitted directly after code and code_size is a hard limit on where it can start");
 
   __ bind(_trampoline_entry);
-  // TODO: Reduce PhaseOutput::MAX_inst_size -> actual stub size using liveness information that will be available at this point.
-  if (aarch64_test_and_branch_reachable(offset_code, current_offset + PhaseOutput::MAX_inst_size , code_size)) {
+  if (aarch64_test_and_branch_reachable(offset_code, current_offset + get_stub_size() , code_size)) {
     // The next potential trampoline will still be reachable even if we emit the whole stub
     log_info(test)("Skip trampoline: code_size: %d, code_offset: %d, current_offset: %d, trampoline count: %zu",
       code_size, offset_code, current_offset, trampoline_stubs_count());

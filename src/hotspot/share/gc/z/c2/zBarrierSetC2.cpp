@@ -202,7 +202,8 @@ int ZBarrierStubC2::stubs_start_offset() {
 ZBarrierStubC2::ZBarrierStubC2(const MachNode* node) :
     _node(node),
     _entry(),
-    _continuation() {}
+    _continuation(),
+    _label_for_get_size() {}
 
 Register ZBarrierStubC2::result() const {
   return noreg;
@@ -213,6 +214,9 @@ RegMask& ZBarrierStubC2::live() const {
 }
 
 Label* ZBarrierStubC2::entry() {
+  if (Compile::current()->output()->in_scratch_emit_size() && _continuation.is_bound()) {
+    return &_label_for_get_size;
+  }
   // The _entry will never be bound when in_scratch_emit_size() is true.
   // However, we still need to return a label that is not bound now, but
   // will eventually be bound. Any eventually bound label will do, as it

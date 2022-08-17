@@ -206,6 +206,7 @@ private:
 
   ZLoadBarrierStubC2Aarch64(const MachNode* node, Address ref_addr, Register ref, int offset);
 
+  int get_stub_size();
 public:
   static ZLoadBarrierStubC2Aarch64* create(const MachNode* node, Address ref_addr, Register ref, int offset);
 
