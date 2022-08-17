@@ -27,8 +27,8 @@
 #include "code/vmreg.hpp"
 #include "oops/accessDecorators.hpp"
 #ifdef COMPILER2
-#include "opto/optoreg.hpp"
 #include "gc/z/c2/zBarrierSetC2.hpp"
+#include "opto/optoreg.hpp"
 #endif // COMPILER2
 
 #ifdef COMPILER1
@@ -197,35 +197,21 @@ public:
 
 #ifdef COMPILER2
 
-class ZLoadBarrierStubC2Aarch64;
-class ZLoadBarrierStubC2Trampoline : public ZBarrierStubC2 {
-friend class ZLoadBarrierStubC2Aarch64;
-private:
-  ZLoadBarrierStubC2Aarch64 * _stub;
-  bool _first_emit;
-  bool _was_inlined;
-
-  ZLoadBarrierStubC2Trampoline(const MachNode* node, ZLoadBarrierStubC2Aarch64 * stub);
-public:
-
-  virtual Register result() const;
-  virtual void emit_code(MacroAssembler& masm);
-  bool was_inlined() const;
-  bool should_inline();
-  Label* continuation() const;
-};
-
 class ZLoadBarrierStubC2Aarch64 : public ZLoadBarrierStubC2 {
 private:
+  Label _trampoline_entry;
   const int _offset;
+  bool _first_emit;
+  bool _was_inlined;
 
   ZLoadBarrierStubC2Aarch64(const MachNode* node, Address ref_addr, Register ref, int offset);
 
 public:
-  static ZLoadBarrierStubC2Trampoline* create(const MachNode* node, Address ref_addr, Register ref, int offset);
+  static ZLoadBarrierStubC2Aarch64* create(const MachNode* node, Address ref_addr, Register ref, int offset);
 
-  int offset() const { return _offset; }
   virtual void emit_code(MacroAssembler& masm);
+  bool should_inline();
+  Label* entry();
 };
 
 
