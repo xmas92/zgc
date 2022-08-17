@@ -1385,8 +1385,6 @@ void ZLoadBarrierStubC2Aarch64::emit_code(MacroAssembler& masm) {
 
   // Deferred emission, emit actual stub
   if (!_first_emit) {
-    log_info(test)("deferred emit: code_size: %d, code_offset: %d, current_offset: %d, trampoline count: %zu",
-      code_size, offset_code, current_offset, trampoline_stubs_count());
     ZLoadBarrierStubC2::emit_code(masm);
     return;
   }
@@ -1394,8 +1392,6 @@ void ZLoadBarrierStubC2Aarch64::emit_code(MacroAssembler& masm) {
 
   // No trampoline used, defer emission to after trampolines
   if (!_test_and_branch_reachable) {
-    log_info(test)("!_test_and_branch_reachable, defer: code_size: %d, code_offset: %d, current_offset: %d, trampoline count: %zu",
-      code_size, offset_code, current_offset, trampoline_stubs_count());
     register_stub(this);
     return;
   }
@@ -1406,13 +1402,9 @@ void ZLoadBarrierStubC2Aarch64::emit_code(MacroAssembler& masm) {
   __ bind(_trampoline_entry);
   if (aarch64_test_and_branch_reachable(offset_code, current_offset + get_stub_size() , code_size)) {
     // The next potential trampoline will still be reachable even if we emit the whole stub
-    log_info(test)("Skip trampoline: code_size: %d, code_offset: %d, current_offset: %d, trampoline count: %zu",
-      code_size, offset_code, current_offset, trampoline_stubs_count());
     ZLoadBarrierStubC2::emit_code(masm);
   } else {
     // Emit trampoline and defer actual stub to the end
-    log_info(test)("Emit trampoline: code_size: %d, code_offset: %d, current_offset: %d, trampoline count: %zu",
-      code_size, offset_code, current_offset, trampoline_stubs_count());
     assert(aarch64_test_and_branch_reachable(offset_code, current_offset, code_size), "trampoline should be reachable");
     __ b(*ZLoadBarrierStubC2::entry());
     register_stub(this);
