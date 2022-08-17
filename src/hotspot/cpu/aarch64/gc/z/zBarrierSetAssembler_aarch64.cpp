@@ -1344,7 +1344,20 @@ bool aarch64_test_and_branch_reachable(int offset_code, int offset_stubs, int co
 }
 
 ZLoadBarrierStubC2Aarch64::ZLoadBarrierStubC2Aarch64(const MachNode* node, Address ref_addr, Register ref, int offset)
-  : ZLoadBarrierStubC2(node, ref_addr, ref), _trampoline_entry(), _offset(offset), _first_emit(true), _was_inlined(true) {}
+  : ZLoadBarrierStubC2(node, ref_addr, ref), _trampoline_entry(), _offset(offset), _first_emit(true), _test_and_branch_reachable(false) {
+    PhaseOutput* const output = Compile::current()->output();
+    if (output->in_scratch_emit_size()) {
+      return;
+    }
+    const int code_size = output->buffer_sizing_data()->_code;
+    const int offset_code = _offset;
+    // TODO: Check that branch is always NativeInstruction::instruction_size bytes. REF: MacroAssembler::far_codestub_branch_size()
+    const int trampoline_offset = trampoline_stubs_count() * NativeInstruction::instruction_size;
+    _test_and_branch_reachable = aarch64_test_and_branch_reachable(offset_code, trampoline_offset, code_size);
+    if (_test_and_branch_reachable) {
+      inc_trampoline_stubs_count();
+    }
+  }
 
 ZLoadBarrierStubC2Aarch64* ZLoadBarrierStubC2Aarch64::create(const MachNode* node, Address ref_addr, Register ref, int offset) {
   ZLoadBarrierStubC2Aarch64* const stub = new (Compile::current()->comp_arena()) ZLoadBarrierStubC2Aarch64(node, ref_addr, ref, offset);
@@ -1368,8 +1381,8 @@ void ZLoadBarrierStubC2Aarch64::emit_code(MacroAssembler& masm) {
   _first_emit = false;
 
   // No trampoline used, defer emission to after trampolines
-  if (_was_inlined) {
-    log_info(test)("_was_inlined, defer: code_size: %d, code_offset: %d, current_offset: %d, trampoline count: %zu",
+  if (!_test_and_branch_reachable) {
+    log_info(test)("!_test_and_branch_reachable, defer: code_size: %d, code_offset: %d, current_offset: %d, trampoline count: %zu",
       code_size, offset_code, current_offset, trampoline_stubs_count());
     register_stub(this);
     return;
@@ -1395,25 +1408,12 @@ void ZLoadBarrierStubC2Aarch64::emit_code(MacroAssembler& masm) {
   }
 }
 
-// TODO: Cleanup this, currently should only be called once
-bool ZLoadBarrierStubC2Aarch64::should_inline() {
-  PhaseOutput* const output = Compile::current()->output();
-  if (output->in_scratch_emit_size()) {
-    return true;
-  }
-  const int code_size = output->buffer_sizing_data()->_code;
-  const int offset_code = _offset;
-  // TODO: Check that branch is always NativeInstruction::instruction_size bytes. REF: MacroAssembler::far_codestub_branch_size()
-  const int trampoline_offset = trampoline_stubs_count() * NativeInstruction::instruction_size;
-  _was_inlined = !aarch64_test_and_branch_reachable(offset_code, trampoline_offset, code_size);
-  if (!_was_inlined) {
-    inc_trampoline_stubs_count();
-  }
-  return _was_inlined;
+bool ZLoadBarrierStubC2Aarch64::is_test_and_branch_reachable() {
+  return _test_and_branch_reachable;
 }
 
 Label* ZLoadBarrierStubC2Aarch64::entry() {
-  if (!_was_inlined) {
+  if (_test_and_branch_reachable) {
     return &_trampoline_entry;
   }
   return ZBarrierStubC2::entry();
@@ -1430,7 +1430,7 @@ ZStoreBarrierStubC2Aarch64* ZStoreBarrierStubC2Aarch64::create(const MachNode* n
 
 void ZStoreBarrierStubC2Aarch64::emit_code(MacroAssembler& masm) {
   if (_first_emit) {
-    // Put this stub at the back of the queue so that load trampolines are emitted first
+    // Defer emission of store barriers so that trampolines are emitted first
     _first_emit = false;
     register_stub(this);
     return;

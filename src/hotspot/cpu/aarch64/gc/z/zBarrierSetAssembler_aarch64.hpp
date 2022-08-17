@@ -202,7 +202,7 @@ private:
   Label _trampoline_entry;
   const int _offset;
   bool _first_emit;
-  bool _was_inlined;
+  bool _test_and_branch_reachable;
 
   ZLoadBarrierStubC2Aarch64(const MachNode* node, Address ref_addr, Register ref, int offset);
 
@@ -210,7 +210,7 @@ public:
   static ZLoadBarrierStubC2Aarch64* create(const MachNode* node, Address ref_addr, Register ref, int offset);
 
   virtual void emit_code(MacroAssembler& masm);
-  bool should_inline();
+  bool is_test_and_branch_reachable();
   Label* entry();
 };
 
