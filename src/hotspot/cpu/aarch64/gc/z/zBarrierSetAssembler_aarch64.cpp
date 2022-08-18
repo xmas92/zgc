@@ -1353,7 +1353,7 @@ ZLoadBarrierStubC2Aarch64::ZLoadBarrierStubC2Aarch64(const MachNode* node, Addre
   }
   const int code_size = output->buffer_sizing_data()->_code;
   const int offset_code = _offset;
-  // Assumption that the stub can always be reached from a branch intermediate. (128 M Product, 2 M Debug)
+  // Assumption that the stub can always be reached from a branch immediate. (128 M Product, 2 M Debug)
   // Same assumption is made in z_aarch64.ad
   const int trampoline_offset = trampoline_stubs_count() * NativeInstruction::instruction_size;
   _test_and_branch_reachable = aarch64_test_and_branch_reachable(offset_code, trampoline_offset, code_size);
