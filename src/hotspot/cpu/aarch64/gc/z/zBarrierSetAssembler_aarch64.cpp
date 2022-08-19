@@ -362,9 +362,10 @@ void ZBarrierSetAssembler::store_at(MacroAssembler* masm,
                                     Address dst,
                                     Register val,
                                     Register tmp1,
-                                    Register tmp2) {
+                                    Register tmp2,
+                                    Register tmp3) {
   if (!ZBarrierSet::barrier_needed(decorators, type)) {
-    BarrierSetAssembler::store_at(masm, decorators, type, dst, val, tmp1, tmp2);
+    BarrierSetAssembler::store_at(masm, decorators, type, dst, val, tmp1, tmp2, tmp3);
     return;
   }
 
@@ -414,8 +415,9 @@ void ZBarrierSetAssembler::store_at(MacroAssembler* masm,
     __ bind(done);
   }
 
+  // TODO: is this tmp noreg alright, we know BarrierSetAssembler::store_at does not use any tmp
   // Store value
-  BarrierSetAssembler::store_at(masm, decorators, type, dst, tmp1, tmp2, noreg);
+  BarrierSetAssembler::store_at(masm, decorators, type, dst, tmp1, tmp2, noreg, noreg);
 }
 
 static FloatRegister z_copy_load_bad_vreg = v11;

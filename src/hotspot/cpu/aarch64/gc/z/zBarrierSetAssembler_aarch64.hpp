@@ -88,7 +88,8 @@ public:
                         Address dst,
                         Register val,
                         Register tmp1,
-                        Register tmp2);
+                        Register tmp2,
+                        Register tmp3);
 
   virtual void arraycopy_prologue(MacroAssembler* masm,
                                   DecoratorSet decorators,

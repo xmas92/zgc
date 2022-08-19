@@ -852,7 +852,7 @@ public:
                       Register tmp1, Register tmp2);
 
   void access_store_at(BasicType type, DecoratorSet decorators, Address dst, Register src,
-                       Register tmp1, Register tmp2);
+                       Register tmp1, Register tmp2, Register tmp3);
 
   void load_heap_oop(Register dst, Address src, Register tmp1,
                      Register tmp2, DecoratorSet decorators = 0);
@@ -860,7 +860,7 @@ public:
   void load_heap_oop_not_null(Register dst, Address src, Register tmp1,
                               Register tmp2, DecoratorSet decorators = 0);
   void store_heap_oop(Address dst, Register src, Register tmp1,
-                      Register tmp2, DecoratorSet decorators = 0);
+                      Register tmp2, Register tmp3, DecoratorSet decorators = 0);
 
   // currently unimplemented
   // Used for storing NULL. All other oop constants should be
