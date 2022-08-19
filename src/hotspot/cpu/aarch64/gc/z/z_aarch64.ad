@@ -70,12 +70,11 @@ static void z_load_barrier(MacroAssembler& _masm, const MachNode* node, Address 
 
   ZLoadBarrierStubC2Aarch64* const stub = ZLoadBarrierStubC2Aarch64::create(node, ref_addr, ref, __ offset());
   if (stub->is_test_and_branch_reachable()) {
-    // TODO: Correct ZBarrierRelocationFormatLoadGoodBeforeTbz name
-    __ relocate(barrier_Relocation::spec(), ZBarrierRelocationFormatLoadGoodBeforeTbz);
+    __ relocate(barrier_Relocation::spec(), ZBarrierRelocationFormatLoadGoodBeforeTbX);
     __ tbnz(ref, barrier_Relocation::unpatched, *stub->entry());
   } else {
     Label good;
-    __ relocate(barrier_Relocation::spec(), ZBarrierRelocationFormatLoadGoodBeforeTbz);
+    __ relocate(barrier_Relocation::spec(), ZBarrierRelocationFormatLoadGoodBeforeTbX);
     __ tbz(ref, barrier_Relocation::unpatched, good);
     __ b(*stub->entry());
     __ bind(good);

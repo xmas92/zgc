@@ -45,7 +45,10 @@ class MachNode;
 class Node;
 #endif // COMPILER2
 
-const int ZBarrierRelocationFormatLoadGoodBeforeTbz  = 0;
+// ZBarrierRelocationFormatLoadGoodBeforeTbX is used for both tbnz and tbz
+// They are patched in the same way, their immediate value has the same
+// structure
+const int ZBarrierRelocationFormatLoadGoodBeforeTbX  = 0;
 const int ZBarrierRelocationFormatMarkBadBeforeMov   = 1;
 const int ZBarrierRelocationFormatStoreGoodBeforeMov = 2;
 const int ZBarrierRelocationFormatStoreBadBeforeMov  = 3;

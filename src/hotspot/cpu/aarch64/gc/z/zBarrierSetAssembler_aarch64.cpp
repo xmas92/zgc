@@ -891,7 +891,7 @@ bool ZBarrierSetAssembler::nmethod_code_patching() {
 
 static uint16_t patch_barrier_relocation_value(int format) {
   switch (format) {
-  case ZBarrierRelocationFormatLoadGoodBeforeTbz:
+  case ZBarrierRelocationFormatLoadGoodBeforeTbX:
     return (uint16_t)exact_log2(ZPointerRemapped);
 
   case ZBarrierRelocationFormatMarkBadBeforeMov:
@@ -920,7 +920,7 @@ void ZBarrierSetAssembler::patch_barrier_relocation(address addr, int format) {
   uint32_t* const patch_addr = (uint32_t*)addr;
 
   switch (format) {
-  case ZBarrierRelocationFormatLoadGoodBeforeTbz:
+  case ZBarrierRelocationFormatLoadGoodBeforeTbX:
     change_immediate(*patch_addr, value, 19, 23);
     break;
   case ZBarrierRelocationFormatStoreGoodBeforeMov:
@@ -974,7 +974,7 @@ void ZBarrierSetAssembler::generate_c1_load_barrier(LIR_Assembler* ce,
     z_uncolor(ce, ref);
   } else {
     Label good;
-    __ relocate(barrier_Relocation::spec(), ZBarrierRelocationFormatLoadGoodBeforeTbz);
+    __ relocate(barrier_Relocation::spec(), ZBarrierRelocationFormatLoadGoodBeforeTbX);
     __ tbz(ref->as_register(), barrier_Relocation::unpatched, good);
     __ b(*stub->entry());
     __ bind(good);
