@@ -1330,12 +1330,14 @@ void ZBarrierSetAssembler::generate_c2_store_barrier_stub(MacroAssembler* masm, 
 #undef __
 #define __ masm.
 
-bool aarch64_test_and_branch_reachable(int offset_code, int offset_stubs, int code_size) {
+static bool aarch64_test_and_branch_reachable(int offset_code, int offset_stubs, int code_size) {
   if (code_size == 0) {
     // Code size unknown
     return false;
   }
-  assert(offset_code >= 0 && offset_stubs >= 0 && code_size > 0, "offsets and sizes must be positive");
+  assert(offset_code >= 0, "branch to stub offsets must be positive");
+  assert(offset_stubs >= 0, "offset in stubs section must be positive");
+  assert(code_size > 0, "code size must be positive");
   assert(code_size >= offset_code, "offset must be contained in code");
 
   const int test_and_branch_delta_limit = 32 * K;
