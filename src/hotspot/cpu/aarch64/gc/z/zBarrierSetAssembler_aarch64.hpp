@@ -250,16 +250,13 @@ public:
 //  Version 1: Is emitted if the pessimistic distance between the branch instruction and the current
 //             trampoline slot cannot fit in a test and branch immediate.
 //
-//  Version 2: Is emitted if the pessimistic distance between the branch instruction and the current
-//             trampoline slot can fit in a test and branch immediate. But emitting the stub directly
-//             would interfere with the next trampoline.
+//  Version 2: Is emitted if the distance between the branch instruction and the current trampoline
+//             slot can fit in a test and branch immediate. But emitting the stub directly would
+//             interfere with the next trampoline.
 //
 //  Version 3: Same as version two but emitting the stub directly (skipping the trampoline) does not
 //             interfere with the next trampoline.
 //
-//  While emitting load barriers the current trampoline slot is the stub section start + NativeInstruction::instruction_size
-//  While emitting stubs the current trampoline slot is always where the next instruction would be emitted.
-
 class ZLoadBarrierStubC2Aarch64 : public ZLoadBarrierStubC2 {
 private:
   Label _test_and_branch_reachable_entry;

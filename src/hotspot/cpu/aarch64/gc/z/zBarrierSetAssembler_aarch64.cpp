@@ -21,6 +21,7 @@
  * questions.
  */
 
+#include "nativeInst_aarch64.hpp"
 #include "precompiled.hpp"
 #include "asm/macroAssembler.inline.hpp"
 #include "code/codeBlob.hpp"
@@ -1400,10 +1401,11 @@ void ZLoadBarrierStubC2Aarch64::emit_code(MacroAssembler& masm) {
   assert(stubs_start_offset() <= output->buffer_sizing_data()->_code, "stubs are assumed to be emitted directly after code and code_size is a hard limit on where it can start");
 
   __ bind(_test_and_branch_reachable_entry);
-  // If the current branch can reach the next trampoline slot if we emit this stub directly then the next branch will
-  // also reach the next trampoline slot as it will always be closer to the stub section than the current branch. So
-  // the current stub is emitted directly and skips the trampoline, if this is not the case the trampoline is emitted.
-  if (aarch64_test_and_branch_reachable(branch_offset, target_offset + get_stub_size())) {
+
+  // Next branch's offset is unknown, but is > branch_offset
+  const int next_branch_offset = branch_offset + NativeInstruction::instruction_size;
+  // If emitting the stub directly does not interfere with emission of the next trampoline then do it to avoid a double jump.
+  if (aarch64_test_and_branch_reachable(next_branch_offset, target_offset + get_stub_size())) {
     // The next potential trampoline will still be reachable even if we emit the whole stub
     ZLoadBarrierStubC2::emit_code(masm);
   } else {
