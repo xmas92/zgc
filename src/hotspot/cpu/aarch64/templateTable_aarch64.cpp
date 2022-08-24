@@ -145,7 +145,6 @@ static void do_oop_store(InterpreterMacroAssembler* _masm,
                          Register val,
                          DecoratorSet decorators) {
   assert(val == noreg || val == r0, "parameter is just for looks");
-  // TODO: r3 picked simply because it is what G1 uses, is this a correct API?
   __ store_heap_oop(dst, val, r10, r11, r3, decorators);
 }
 

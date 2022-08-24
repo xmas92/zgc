@@ -415,7 +415,6 @@ void ZBarrierSetAssembler::store_at(MacroAssembler* masm,
     __ bind(done);
   }
 
-  // TODO: is this tmp noreg alright, we know BarrierSetAssembler::store_at does not use any tmp
   // Store value
   BarrierSetAssembler::store_at(masm, decorators, type, dst, tmp1, tmp2, noreg, noreg);
 }
