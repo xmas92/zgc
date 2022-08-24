@@ -214,6 +214,15 @@ public:
 // From the branch shortening part of PhaseOutput we get a pessimistic code size that the code
 // will not grow beyond.
 //
+// The stubs objects are created and registered when the load barriers are emitted. The decision
+// between emitting the long branch or the test and branch is done at this point and uses the
+// pessimistic code size from branch shortening.
+//
+// After the code has been emitted the barrier set will emit all the stubs. When the stubs are
+// emitted we know the real code size. Because of this the trampoline jump can be skipped in
+// favour of emitting the stub directly if it does not interfere with the next trampoline stub.
+// (With respect to test and branch distance)
+//
 // The algorithm for emitting the load barrier branches and stubs now have three versions
 // depending on the distance between the barrier and the stub.
 // Version 1: Not Reachable with a test-and-branch immediate
@@ -242,25 +251,20 @@ public:
 //             trampoline slot cannot fit in a test and branch immediate.
 //
 //  Version 2: Is emitted if the pessimistic distance between the branch instruction and the current
-//             trampoline slot can fit in a test and branch immediate. But we cannot guarantee that
-//             the next branch can reach the next trampoline slot if we emitted the current stub
-//             directly.
+//             trampoline slot can fit in a test and branch immediate. But emitting the stub directly
+//             would interfere with the next trampoline.
 //
-//  Version 2: Is emitted if the pessimistic distance between the branch instruction and the current
-//             trampoline slot can fit in a test and branch immediate. And we can guarantee that the
-//             next branch can reach the next trampoline slot if we emit this stub directly, skipping
-//             the trampoline.
+//  Version 3: Same as version two but emitting the stub directly (skipping the trampoline) does not
+//             interfere with the next trampoline.
 //
 //  While emitting load barriers the current trampoline slot is the stub section start + NativeInstruction::instruction_size
 //  While emitting stubs the current trampoline slot is always where the next instruction would be emitted.
 
-//  Selection between 1 and 2/3, that is between branch and test-and-branch, is done when emitting the load
-//  barrier and selecting between 2 and 3 is done when emitting stubs, preferring 3 whenever possible.
 class ZLoadBarrierStubC2Aarch64 : public ZLoadBarrierStubC2 {
 private:
-  Label _trampoline_entry;
+  Label _test_and_branch_reachable_entry;
   const int _offset;
-  bool _first_emit;
+  bool _deferred_emit;
   bool _test_and_branch_reachable;
 
   ZLoadBarrierStubC2Aarch64(const MachNode* node, Address ref_addr, Register ref, int offset);
@@ -277,7 +281,7 @@ public:
 
 class ZStoreBarrierStubC2Aarch64 : public ZStoreBarrierStubC2 {
 private:
-  bool _first_emit;
+  bool _deferred_emit;
 
   ZStoreBarrierStubC2Aarch64(const MachNode* node, Address ref_addr, Register new_zaddress, Register new_zpointer, bool is_native, bool is_atomic);
 
