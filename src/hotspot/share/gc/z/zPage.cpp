@@ -153,7 +153,7 @@ void ZPage::reset_remembered_set(ZPageAge prev_age, ZPageResetType type) {
 }
 
 void ZPage::install_arm_value() {
-  ZPageArmTable::set(this, is_old() ? int8_t(1) : ZPageArmGoodMask);
+  ZPageArmTable::set(this, is_old() ? int8_t(ZPageArmOld) : ZPageArmGoodMask);
 }
 
 void ZPage::reset(ZPageAge age, ZPageResetType type) {

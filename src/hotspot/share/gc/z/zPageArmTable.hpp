@@ -30,8 +30,11 @@
 
 class ZPage;
 
-constexpr int8_t ZPageArmYoungMetadataMask = 2 + 4;
-constexpr int8_t ZPageArmOldMetadataMask = 1;
+constexpr int8_t ZPageArmOld = 1;
+constexpr int8_t ZPageArmYoung0 = 2;
+constexpr int8_t ZPageArmYoung1 = 4;
+constexpr int8_t ZPageArmYoungMetadataMask = ZPageArmYoung0 | ZPageArmYoung1;
+constexpr int8_t ZPageArmOldMetadataMask = ZPageArmOld;
 constexpr int8_t ZPageArmMetadataMask = ZPageArmYoungMetadataMask | ZPageArmOldMetadataMask;
 extern int8_t ZPageArmGoodMask;
 extern int8_t ZPageArmBadMask;

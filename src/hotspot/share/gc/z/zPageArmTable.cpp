@@ -38,7 +38,6 @@ intptr_t ZPageArmTable::_table_bias = 0;
 // Note that this table is placed in a low-address location,
 // so that it can be encoded in the cmp instruction. This is
 // faster than issuing an explicit load of the table address.
-// See the usage of table_bias in cmp_page_bits.
 
 bool ZPageArmTable::reserve() {
   // table_bias = table_base - addr_base >> ZGranuleSizeShift
@@ -76,12 +75,13 @@ void ZPageArmTable::initialize() {
     return;
   }
 
-  ZPageArmGoodMask = 4;
+  ZPageArmGoodMask = ZPageArmYoung0;
   ZPageArmBadMask = ZPageArmGoodMask ^ ZPageArmMetadataMask;
 }
 
 void ZPageArmTable::flip_young_mark_start() {
   ZPageArmGoodMask ^= ZPageArmYoungMetadataMask;
+  ZPageArmBadMask = ZPageArmGoodMask ^ ZPageArmMetadataMask;
 }
 
 intptr_t ZPageArmTable::table_bias(uintptr_t table_base) {
