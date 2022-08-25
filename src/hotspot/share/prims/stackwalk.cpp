@@ -94,8 +94,6 @@ LiveFrameStream::LiveFrameStream(JavaThread* thread, RegisterMap* rm, Handle con
     if (cont.is_null()) {
       _jvf  = thread->last_java_vframe(rm);
       _cont_entry = thread->last_continuation();
-          // Make sure oops in entry are accessible
-      _cont_entry->flush_stack_processing(thread);
     } else {
       _jvf  = Continuation::last_java_vframe(cont, rm);
       _cont_entry = NULL;
@@ -431,8 +429,11 @@ oop StackWalk::walk(Handle stackStream, jlong mode, int skip_frames, Handle cont
   // Setup traversal onto my stack.
   if (live_frame_info(mode)) {
     assert(use_frames_array(mode), "Bad mode for get live frame");
-    RegisterMap regMap = cont.is_null() ? RegisterMap(jt, true, true, true)
-                                        : RegisterMap(cont(), true);
+    RegisterMap regMap = cont.is_null() ? RegisterMap(jt,
+                                                      RegisterMap::UpdateMap::include,
+                                                      RegisterMap::ProcessFrames::include,
+                                                      RegisterMap::WalkContinuation::include)
+                                        : RegisterMap(cont(), RegisterMap::UpdateMap::include);
     LiveFrameStream stream(jt, &regMap, cont_scope, cont);
     return fetchFirstBatch(stream, stackStream, mode, skip_frames, frame_count,
                            start_index, frames_array, THREAD);
