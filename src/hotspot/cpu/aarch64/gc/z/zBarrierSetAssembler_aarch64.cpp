@@ -21,6 +21,7 @@
  * questions.
  */
 
+#include "gc/z/zPageArmTable.hpp"
 #include "precompiled.hpp"
 #include "asm/macroAssembler.inline.hpp"
 #include "code/codeBlob.hpp"
@@ -30,6 +31,7 @@
 #include "gc/z/zBarrierSet.hpp"
 #include "gc/z/zBarrierSetAssembler.hpp"
 #include "gc/z/zBarrierSetRuntime.hpp"
+#include "gc/z/zPageArmTable.inline.hpp"
 #include "gc/z/zThreadLocalData.hpp"
 #include "memory/resourceArea.hpp"
 #include "runtime/jniHandles.hpp"
@@ -214,21 +216,8 @@ void ZBarrierSetAssembler::load_at(MacroAssembler* masm,
   __ bind(done);
 }
 
-void ZBarrierSetAssembler::store_barrier_fast(MacroAssembler* masm,
-                                              Address ref_addr,
-                                              Register rnew_zaddress,
-                                              Register rnew_zpointer,
-                                              Register rtmp,
-                                              bool in_nmethod,
-                                              bool is_atomic,
-                                              Label& medium_path,
-                                              Label& medium_path_continuation) const {
-  assert_different_registers(ref_addr.base(), rnew_zpointer, rtmp);
-  assert_different_registers(ref_addr.index(), rnew_zpointer, rtmp);
-  assert_different_registers(rnew_zaddress, rnew_zpointer, rtmp);
-
-  if (in_nmethod) {
-    if (is_atomic) {
+static void emit_store_fast_path_check(MacroAssembler* masm, Address ref_addr, Register rnew_zpointer, Register rtmp, bool is_atomic) {
+  if (is_atomic) {
       __ ldrh(rtmp, ref_addr);
       // Atomic operations must ensure that the contents of memory are store-good before
       // an atomic operation can execute.
@@ -246,6 +235,36 @@ void ZBarrierSetAssembler::store_barrier_fast(MacroAssembler* masm,
       __ relocate(barrier_Relocation::spec(), ZBarrierRelocationFormatStoreBadBeforeMov);
       __ movzw(rnew_zpointer, barrier_Relocation::unpatched);
       __ tst(rtmp, rnew_zpointer);
+    }
+}
+
+void ZBarrierSetAssembler::store_barrier_fast(MacroAssembler* masm,
+                                              Address ref_addr,
+                                              Register rnew_zaddress,
+                                              Register rnew_zpointer,
+                                              Register rtmp,
+                                              bool in_nmethod,
+                                              bool is_atomic,
+                                              Label& medium_path,
+                                              Label& medium_path_continuation) const {
+  assert_different_registers(ref_addr.base(), rnew_zpointer, rtmp);
+  assert_different_registers(ref_addr.index(), rnew_zpointer, rtmp);
+  assert_different_registers(rnew_zaddress, rnew_zpointer, rtmp);
+
+  if (in_nmethod) {
+    if (!is_atomic && ZArmPages) {
+      // Check if page is "armed". Only armed pages need pre-load barrier. In some
+      // workloads, it might be more caching friendly to load from the table instead
+      // of from the field, as one 64 byte cache line worth of table covers 128M worth
+      // of virtual address space. With reasonable locality, misses should be rare.
+      // This filter is however optional. Pages subject to marking are "armed" and old
+      __ lsr(rnew_zpointer, ref_addr.base(), ZPageArmTable::addr_shift());
+      __ mov(rtmp, ZPageArmTable::table_bias());
+      __ ldrb(rnew_zpointer, Address(rnew_zpointer, rtmp));
+      __ relocate(barrier_Relocation::spec(), ZBarrierRelocationFormatPageArmBeforeTst);
+      __ tst(rnew_zpointer, 1);
+    } else {
+      emit_store_fast_path_check(masm, ref_addr, rnew_zpointer, rtmp, is_atomic);
     }
     __ br(Assembler::NE, medium_path);
     __ bind(medium_path_continuation);
@@ -310,6 +329,7 @@ void ZBarrierSetAssembler::store_barrier_medium(MacroAssembler* masm,
                                                 Register rtmp1,
                                                 Register rtmp2,
                                                 Register rtmp3,
+                                                bool in_nmethod,
                                                 bool is_native,
                                                 bool is_atomic,
                                                 Label& medium_path_continuation,
@@ -342,6 +362,13 @@ void ZBarrierSetAssembler::store_barrier_medium(MacroAssembler* masm,
     __ bind(slow_path_continuation);
     __ b(medium_path_continuation);
   } else {
+    if (in_nmethod && ZArmPages) {
+      Label medium_path;
+      emit_store_fast_path_check(masm,ref_addr,rtmp1,rtmp2,is_atomic);
+      __ br(Assembler::NE, medium_path);
+      __ b(medium_path_continuation);
+      __ bind(medium_path);
+    }
     // A non-atomic relocatable object won't get to the medium fast path due to a
     // raw NULL in the young generation. We only get here because the field is bad.
     // In this path we don't need any self healing, so we can avoid a runtime call
@@ -396,6 +423,7 @@ void ZBarrierSetAssembler::store_at(MacroAssembler* masm,
                          tmp1,
                          tmp2,
                          noreg /* tmp3 */,
+                         false /* in_nmethod */,
                          false /* is_native */,
                          false /* is_atomic */,
                          medium_continuation,
@@ -903,6 +931,9 @@ static uint16_t patch_barrier_relocation_value(int format) {
   case ZBarrierRelocationFormatStoreBadBeforeMov:
     return (uint16_t)ZPointerStoreBadMask;
 
+  case ZBarrierRelocationFormatPageArmBeforeTst:
+    return (uint16_t)asm_util::encode_logical_immediate(false /* is32 */, ~((uint64_t)ZPageArmGoodMask));
+
   default:
     ShouldNotReachHere();
     return 0;
@@ -913,6 +944,32 @@ static void change_immediate(uint32_t& instr, uint32_t imm, uint32_t start, uint
   uint32_t imm_mask = ((1u << start) - 1u) ^ ((1u << (end + 1)) - 1u);
   instr &= ~imm_mask;
   instr |= imm << start;
+}
+
+static uint8_t countl_one(uint8_t v) {
+  return __builtin_clz(~v);
+}
+
+static uint64_t rotr(uint64_t x, uint8_t r) {
+  return (x >> r) | (x << (64 - r));
+}
+// sf opc      N immr   imms   Rn    Rd
+// 1  11100100 1 000000 000000 00000 11111
+// 1  11100111 1 111111 111111 00000 11111
+static uint64_t decode(uint32_t n_immr_imms) {
+    uint16_t n = (n_immr_imms >> 12) & 0b1;
+    uint16_t immr = (n_immr_imms >> 6) & 0b111111;
+    uint16_t imms = n_immr_imms & 0b111111;
+    const uint8_t size = n ? 64 : (1 << (5 - countl_one(imms)));
+    const uint8_t shift = (imms & (size-1)) + 1;
+    const uint8_t rotation = immr;
+    uint64_t result = ~0ull;
+    result >>= (64 - shift);
+    for (uint8_t e = size; e < 64; e *= 2) {
+        result |= (result << e);
+    }
+    result = rotr(result, rotation);
+    return result;
 }
 
 void ZBarrierSetAssembler::patch_barrier_relocation(address addr, int format) {
@@ -927,6 +984,14 @@ void ZBarrierSetAssembler::patch_barrier_relocation(address addr, int format) {
   case ZBarrierRelocationFormatMarkBadBeforeMov:
   case ZBarrierRelocationFormatStoreBadBeforeMov:
     change_immediate(*patch_addr, value, 5, 20);
+    break;
+  case ZBarrierRelocationFormatPageArmBeforeTst:
+    assert(value != 0xffff, "bad immediate");
+    assert((value & ~0x1fff) == 0, "bad immediate");
+    assert((decode(value) & ZPageArmGoodMask) == 0, "sanity");
+    assert((decode(value) & ZPageArmBadMask) != 0, "sanity");
+    assert((decode(value) & ZPageArmOld) != 0, "sanity");
+    change_immediate(*patch_addr,  value, 10, 22);
     break;
   default:
     ShouldNotReachHere();
@@ -1068,6 +1133,7 @@ void ZBarrierSetAssembler::generate_c1_store_barrier_stub(LIR_Assembler* ce,
                        rscratch2,
                        stub->new_zpointer()->as_register(),
                        rscratch1,
+                       true /* in_nmethod */,
                        false /* is_native */,
                        stub->is_atomic(),
                        *stub->continuation(),
@@ -1299,6 +1365,7 @@ void ZBarrierSetAssembler::generate_c2_store_barrier_stub(MacroAssembler* masm, 
                        stub->new_zpointer(),
                        rscratch1,
                        rscratch2,
+                       true /* in_nmethod */,
                        stub->is_native(),
                        stub->is_atomic(),
                        *stub->continuation(),

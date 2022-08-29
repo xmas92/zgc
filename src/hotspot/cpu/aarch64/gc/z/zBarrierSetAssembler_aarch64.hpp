@@ -50,6 +50,7 @@ const int ZBarrierRelocationFormatLoadGoodBeforeTbz  = 0;
 const int ZBarrierRelocationFormatMarkBadBeforeMov   = 1;
 const int ZBarrierRelocationFormatStoreGoodBeforeMov = 2;
 const int ZBarrierRelocationFormatStoreBadBeforeMov  = 3;
+const int ZBarrierRelocationFormatPageArmBeforeTst   = 4;
 
 class ZBarrierSetAssembler : public ZBarrierSetAssemblerBase {
 public:
@@ -76,6 +77,7 @@ public:
                             Register rtmp1,
                             Register rtmp2,
                             Register rtmp3,
+                            bool in_nmethod,
                             bool is_native,
                             bool is_atomic,
                             Label& medium_path_continuation,

@@ -45,6 +45,8 @@ private:
   static intptr_t _table_bias;
 
   static intptr_t table_bias(uintptr_t table_base);
+  static bool try_reserve(char* addr);
+  static bool reserve_bsd_aarch64();
   static bool reserve();
 
 public:
