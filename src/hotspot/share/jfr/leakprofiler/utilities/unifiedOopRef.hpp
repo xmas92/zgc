@@ -31,17 +31,25 @@
 struct UnifiedOopRef {
   uintptr_t _value;
 
+  static const uintptr_t tag_mask = 0b11;
+  static const uintptr_t heap_tag = 0b00;
+  static const uintptr_t narrow_tag = 0b01;
+  static const uintptr_t native_tag = 0b10;
+  static const uintptr_t non_barriered_tag = 0b11;
+  STATIC_ASSERT((narrow_tag & native_tag) == 0);
+
   template <typename T>
   T addr() const;
 
   bool is_narrow() const;
   bool is_native() const;
+  bool is_non_barriered() const;
   bool is_null() const;
 
   oop dereference() const;
 
-  static UnifiedOopRef encode_in_native(const narrowOop* ref);
   static UnifiedOopRef encode_in_native(const oop* ref);
+  static UnifiedOopRef encode_non_barriered(const oop* ref);
   static UnifiedOopRef encode_in_heap(const oop* ref);
   static UnifiedOopRef encode_in_heap(const narrowOop* ref);
   static UnifiedOopRef encode_null();
