@@ -5007,7 +5007,6 @@ void MacroAssembler::resolve_oop_handle(Register result, Register tmp) {
   // OopHandle::resolve is an indirection like jobject.
   access_load_at(T_OBJECT, IN_NATIVE,
                  result, Address(result, 0), tmp, /*tmp_thread*/noreg);
-  verify_oop_msg(result, "resolve_oop_handle");
 }
 
 // ((WeakHandle)result).resolve();
@@ -5024,7 +5023,6 @@ void MacroAssembler::resolve_weak_handle(Register rresult, Register rtmp) {
   // WeakHandle::resolve is an indirection like jweak.
   access_load_at(T_OBJECT, IN_NATIVE | ON_PHANTOM_OOP_REF,
                  rresult, Address(rresult, 0), rtmp, /*tmp_thread*/noreg);
-  verify_oop_msg(rresult, "resolve_weak_handle");
   bind(resolved);
 }
 
