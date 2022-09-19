@@ -106,8 +106,6 @@ class jdk_internal_vm_StackChunk: AllStatic {
   static inline oop parent(oop chunk);
   static inline void set_parent(oop chunk, oop value);
   template<typename P>
-  static inline bool is_parent_null(oop chunk); // bypasses barriers for a faster test
-  template<typename P>
   static inline void set_parent_raw(oop chunk, oop value);
   template<DecoratorSet decorators>
   static inline void set_parent_access(oop chunk, oop value);
