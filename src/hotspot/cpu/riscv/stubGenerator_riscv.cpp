@@ -3804,7 +3804,7 @@ class StubGenerator: public StubCodeGenerator {
     __ mv(c_rarg0, thread);
   }
 
-  static void jfr_epilogue(MacroAssembler* _masm, Register thread) {
+  static void jfr_epilogue(MacroAssembler* _masm) {
     __ reset_last_Java_frame(true);
     __ resolve_jobject(x10, t0, t1);
   }

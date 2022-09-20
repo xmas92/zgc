@@ -523,7 +523,7 @@ void MacroAssembler::resolve_jobject(Register value, Register tmp1, Register tmp
   // Resolve global handle
   access_load_at(T_OBJECT, IN_NATIVE | AS_RAW, value, Address(value, 0), tmp1, tmp2);
   //verify_oop(value);
-  b(done);
+  j(done);
 
   bind(tagged);
   // Test for jweak tag.
@@ -533,7 +533,7 @@ void MacroAssembler::resolve_jobject(Register value, Register tmp1, Register tmp
   // Resolve global handle
   access_load_at(T_OBJECT, IN_NATIVE, value,
                  Address(value, -JNIHandles::global_tag_value), tmp1, tmp2);
-  b(done);
+  j(done);
 
   bind(weak_tagged);
   // Resolve jweak.
