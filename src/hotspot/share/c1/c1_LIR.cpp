@@ -1905,6 +1905,7 @@ void LIR_Op::print_condition(outputStream* out, LIR_Condition cond) {
     case lir_cond_greaterEqual:    out->print("[GE]");      break;
     case lir_cond_greater:         out->print("[GT]");      break;
     case lir_cond_belowEqual:      out->print("[BE]");      break;
+    case lir_cond_above:           out->print("[A]");       break;
     case lir_cond_aboveEqual:      out->print("[AE]");      break;
     case lir_cond_always:          out->print("[AL]");      break;
     default:                       out->print("[%d]",cond); break;

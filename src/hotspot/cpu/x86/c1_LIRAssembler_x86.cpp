@@ -1432,6 +1432,7 @@ void LIR_Assembler::emit_opBranch(LIR_OpBranch* op) {
         case lir_cond_greaterEqual: acond = Assembler::greaterEqual;break;
         case lir_cond_greater:      acond = Assembler::greater;     break;
         case lir_cond_belowEqual:   acond = Assembler::belowEqual;  break;
+        case lir_cond_above:        acond = Assembler::above;       break;
         case lir_cond_aboveEqual:   acond = Assembler::aboveEqual;  break;
         default:                         ShouldNotReachHere();
       }
