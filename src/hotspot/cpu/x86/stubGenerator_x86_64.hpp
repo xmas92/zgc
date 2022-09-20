@@ -146,13 +146,17 @@ class StubGenerator: public StubCodeGenerator {
 
   // Copy big chunks forward
   void copy_bytes_forward(Register end_from, Register end_to,
-                          Register qword_count, Register to,
-                          Label& L_copy_bytes, Label& L_copy_8_bytes);
+                          Register qword_count, Register tmp1,
+                          Register tmp2, Label& L_copy_bytes,
+                          Label& L_copy_8_bytes, DecoratorSet decorators,
+                          BasicType type);
 
   // Copy big chunks backward
   void copy_bytes_backward(Register from, Register dest,
-                           Register qword_count, Register to,
-                           Label& L_copy_bytes, Label& L_copy_8_bytes);
+                           Register qword_count, Register tmp1,
+                           Register tmp2, Label& L_copy_bytes,
+                           Label& L_copy_8_bytes, DecoratorSet decorators,
+                           BasicType type);
 
   void setup_argument_regs(BasicType type);
 
