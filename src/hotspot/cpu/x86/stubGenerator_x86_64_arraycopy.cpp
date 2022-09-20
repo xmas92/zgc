@@ -2053,9 +2053,9 @@ address StubGenerator::generate_checkcast_copy(const char *name, address *entry,
   }
 #endif //ASSERT
 
-  setup_arg_regs(4); // from => rdi, to => rsi, length => rdx
-                     // ckoff => rcx, ckval => r8
-                     // r9 and r10 may be used to save non-volatile registers
+  setup_arg_regs_using_thread(4); // from => rdi, to => rsi, length => rdx
+                                  // ckoff => rcx, ckval => r8
+                                  // r9 is used to save r15_thread
 #ifdef _WIN64
   // last argument (#4) is on stack on Win64
   __ movptr(ckval, Address(rsp, 6 * wordSize));
@@ -2179,7 +2179,7 @@ address StubGenerator::generate_checkcast_copy(const char *name, address *entry,
   __ movptr(r13, Address(rsp, saved_r13_offset * wordSize));
   __ movptr(r14, Address(rsp, saved_r14_offset * wordSize));
   __ movptr(r10, Address(rsp, saved_r10_offset * wordSize));
-  restore_arg_regs();
+  restore_arg_regs_using_thread();
   INC_COUNTER_NP(SharedRuntime::_checkcast_array_copy_ctr, rscratch1); // Update counter after rscratch1 is free
   __ leave(); // required for proper stackwalking of RuntimeStub frame
   __ ret(0);
@@ -2595,7 +2595,7 @@ __ BIND(L_checkcast_copy);
     // the checkcast_copy loop needs two extra arguments:
     assert(c_rarg3 == sco_temp, "#3 already in place");
     // Set up arguments for checkcast_copy_entry.
-    setup_arg_regs(4);
+    setup_arg_regs_using_thread(4);
     __ movptr(r8, r11_dst_klass);  // dst.klass.element_klass, r8 is c_rarg4 on Linux/Solaris
     __ jump(RuntimeAddress(checkcast_copy_entry));
   }

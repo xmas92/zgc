@@ -140,7 +140,7 @@ class StubGenerator: public StubCodeGenerator {
 
   // This is used in places where r10 is a scratch register, and can
   // be adapted if r9 is needed also.
-  void setup_arg_regs_using_thread();
+  void setup_arg_regs_using_thread(int nargs = 3);
 
   void restore_arg_regs_using_thread();
 
