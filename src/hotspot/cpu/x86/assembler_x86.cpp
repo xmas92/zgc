@@ -1754,8 +1754,9 @@ void Assembler::cmpl(Register dst, Address  src) {
 
 void Assembler::cmpw(Address dst, int imm16) {
   InstructionMark im(this);
-  assert(!dst.base_needs_rex() && !dst.index_needs_rex(), "no extended registers");
-  emit_int16(0x66, (unsigned char)0x81);
+  emit_int8(0x66);
+  prefix(dst);
+  emit_int8((unsigned char)0x81);
   emit_operand(rdi, dst, 2);
   emit_int16(imm16);
 }
