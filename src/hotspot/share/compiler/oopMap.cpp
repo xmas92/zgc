@@ -29,6 +29,7 @@
 #include "code/scopeDesc.hpp"
 #include "compiler/oopMap.inline.hpp"
 #include "gc/shared/collectedHeap.hpp"
+#include "gc/shared/gc_globals.hpp"
 #include "logging/log.hpp"
 #include "logging/logStream.hpp"
 #include "memory/allocation.inline.hpp"

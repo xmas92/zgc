@@ -27,6 +27,7 @@
 
 #include "classfile/javaClasses.hpp"
 
+#include "gc/shared/gc_globals.hpp"
 #include "memory/referenceType.hpp"
 #include "oops/access.inline.hpp"
 #include "oops/instanceKlass.inline.hpp"
