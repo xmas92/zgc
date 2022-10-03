@@ -88,7 +88,7 @@ void ReferenceLocateClosure::do_oop(oop* ref) {
 }
 
 void ReferenceLocateClosure::do_oop(narrowOop* ref) {
-  do_oop_shared(UnifiedOopRef::encode_in_native(ref));
+  ShouldNotReachHere();
 }
 
 class ReferenceToRootClosure : public StackObj {
