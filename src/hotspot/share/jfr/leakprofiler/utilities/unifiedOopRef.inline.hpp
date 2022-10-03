@@ -32,7 +32,7 @@
 
 template <typename T>
 inline T UnifiedOopRef::addr() const {
-  int shift = is_narrow() ? 1 : 0;
+  int shift = is_narrow() ? IA32_ONLY(0) NOT_IA32(1) : 0;
   return reinterpret_cast<T>((_value & ~uintptr_t(7)) >> shift);
 }
 
@@ -56,7 +56,7 @@ inline bool UnifiedOopRef::is_native() const {
 }
 
 inline bool UnifiedOopRef::is_non_barriered() const {
-  return _value & 4;
+  return IA32_ONLY(false) NOT_IA32(_value & 4);
 }
 
 inline bool UnifiedOopRef::is_null() const {
@@ -66,7 +66,7 @@ inline bool UnifiedOopRef::is_null() const {
 inline UnifiedOopRef UnifiedOopRef::encode_in_native(const narrowOop* ref) {
   assert(ref != NULL, "invariant");
   assert((uintptr_t(ref) & 0x3) == 0, "Unexpected low-order bits");
-  UnifiedOopRef result = { (reinterpret_cast<uintptr_t>(ref) << 1) | 3 };
+  UnifiedOopRef result = { (reinterpret_cast<uintptr_t>(ref) << IA32_ONLY(0) NOT_IA32(1)) | 3 };
   assert(result.addr<narrowOop*>() == ref, "sanity");
   return result;
 }
@@ -90,7 +90,7 @@ inline UnifiedOopRef UnifiedOopRef::encode_non_barriered(const oop* ref) {
 inline UnifiedOopRef UnifiedOopRef::encode_in_heap(const narrowOop* ref) {
   assert(ref != NULL, "invariant");
   assert((uintptr_t(ref) & 0x3) == 0, "Unexpected low-order bits");
-  UnifiedOopRef result = { (reinterpret_cast<uintptr_t>(ref) << 1) | 1 };
+  UnifiedOopRef result = { (reinterpret_cast<uintptr_t>(ref) << IA32_ONLY(0) NOT_IA32(1)) | 1 };
   assert(result.addr<narrowOop*>() == ref, "sanity");
   return result;
 }
