@@ -1252,6 +1252,7 @@ class StackChunkAllocator : public MemAllocator {
   ContinuationWrapper&                         _continuation_wrapper;
   JvmtiSampledObjectAllocEventCollector* const _jvmti_event_collector;
   mutable bool                                 _took_slow_path;
+  mutable stackChunkOop                        _chunk;
 
   // Does the minimal amount of initialization needed for a TLAB allocation.
   // We don't need to do a full initialization, as such an allocation need not be immediately walkable.
@@ -1284,6 +1285,19 @@ class StackChunkAllocator : public MemAllocator {
     return stackChunkOopDesc::cast(obj);
   }
 
+  void check_initializion() const {
+    // assert that chunk is properly initialized
+    assert(_chunk == nullptr || _chunk->stack_size() == (int)_stack_size, "");
+    assert(_chunk == nullptr || _chunk->size() >= _stack_size, "chunk->size(): %zu size: %zu", _chunk->size(), _stack_size);
+    assert(_chunk == nullptr || _chunk->sp() == _chunk->stack_size(), "");
+    assert(_chunk == nullptr || (intptr_t)_chunk->start_address() % 8 == 0, "");
+    assert(_chunk == nullptr || _chunk->max_thawing_size() == 0, "");
+    assert(_chunk == nullptr || _chunk->pc() == nullptr, "");
+    assert(_chunk == nullptr || _chunk->argsize() == 0, "");
+    assert(_chunk == nullptr || _chunk->flags() == 0, "");
+    assert(_chunk == nullptr || _chunk->is_gc_mode() == false, "");
+  }
+
 public:
   StackChunkAllocator(Klass* klass,
                       size_t word_size,
@@ -1295,15 +1309,17 @@ public:
       _stack_size(stack_size),
       _continuation_wrapper(continuation_wrapper),
       _jvmti_event_collector(jvmti_event_collector),
-      _took_slow_path(false) {}
+      _took_slow_path(false),
+      _chunk(nullptr) {}
 
   // Provides it's own, specialized allocation which skips instrumentation
   // if the memory can be allocated without going to a slow-path.
   stackChunkOop allocate() const {
     // First try to allocate without any slow-paths or instrumentation.
-    stackChunkOop obj = allocate_fast();
-    if (obj != nullptr) {
-      return obj;
+    _chunk = allocate_fast();
+    if (_chunk != nullptr) {
+      check_initializion();
+      return _chunk;
     }
 
     // Now try full-blown allocation with all expensive operations,
@@ -1317,11 +1333,34 @@ public:
     _jvmti_event_collector->start();
 
     // Can safepoint
-    return stackChunkOopDesc::cast(MemAllocator::allocate());
+    _chunk = stackChunkOopDesc::cast(MemAllocator::allocate());
+    check_initializion();
+    return _chunk;
   }
 
-  bool took_slow_path() const {
-    return _took_slow_path;
+  bool allocation_requires_barriers() {
+#if INCLUDE_ZGC
+    if (UseZGC) {
+      assert(!_chunk->requires_barriers(), "ZGC always allocates in the young generation");
+      return false;
+    } else
+#endif
+#if INCLUDE_SHENANDOAHGC
+    if (UseShenandoahGC) {
+      return _chunk->requires_barriers();
+    } else
+#endif
+    {
+      if (!_took_slow_path) {
+        // Guaranteed to be in young gen / newly allocated memory
+        assert(!_chunk->requires_barriers(), "Unfamiliar GC requires barriers on TLAB allocation");
+       return false;
+      } else {
+        // Some GCs could put direct allocations in old gen for slow-path
+        // allocations; need to expliticly check if that was the case.
+        return _chunk->requires_barriers();
+      }
+    }
   }
 };
 
@@ -1355,43 +1394,11 @@ stackChunkOop Freeze<ConfigT>::allocate_chunk(size_t stack_size) {
     return nullptr; // OOME
   }
 
-  // assert that chunk is properly initialized
-  assert(chunk->stack_size() == (int)stack_size, "");
-  assert(chunk->size() >= stack_size, "chunk->size(): %zu size: %zu", chunk->size(), stack_size);
-  assert(chunk->sp() == chunk->stack_size(), "");
-  assert((intptr_t)chunk->start_address() % 8 == 0, "");
-  assert(chunk->max_thawing_size() == 0, "");
-  assert(chunk->pc() == nullptr, "");
-  assert(chunk->argsize() == 0, "");
-  assert(chunk->flags() == 0, "");
-  assert(chunk->is_gc_mode() == false, "");
-
   // fields are uninitialized
   chunk->set_parent_access<IS_DEST_UNINITIALIZED>(_cont.last_nonempty_chunk());
   chunk->set_cont_access<IS_DEST_UNINITIALIZED>(_cont.continuation());
 
-#if INCLUDE_ZGC
-  if (UseZGC) {
-    assert(!chunk->requires_barriers(), "ZGC always allocates in the young generation");
-    _barriers = false;
-  } else
-#endif
-#if INCLUDE_SHENANDOAHGC
-  if (UseShenandoahGC) {
-    _barriers = chunk->requires_barriers();
-  } else
-#endif
-  {
-    if (!allocator.took_slow_path()) {
-      // Guaranteed to be in young gen / newly allocated memory
-      assert(!chunk->requires_barriers(), "Unfamiliar GC requires barriers on TLAB allocation");
-      _barriers = false;
-    } else {
-      // Some GCs could put direct allocations in old gen for slow-path
-      // allocations; need to expliticly check if that was the case.
-      _barriers = chunk->requires_barriers();
-    }
-  }
+  _barriers = allocator.allocation_requires_barriers();
 
   if (_barriers) {
     log_develop_trace(continuations)("allocation requires barriers");
