@@ -41,7 +41,7 @@ ZUnmapper::ZUnmapper(ZPageAllocator* page_allocator) :
 }
 
 ZPage* ZUnmapper::dequeue() {
-  ZLocker<ZConditionLock> locker(&_lock);
+  const ZLocker<ZConditionLock> locker(&_lock);
 
   for (;;) {
     if (_stop) {
@@ -71,7 +71,7 @@ void ZUnmapper::do_unmap_and_destroy_page(ZPage* page) const {
 
 void ZUnmapper::unmap_and_destroy_page(ZPage* page) {
   // Enqueue for asynchronous unmap and destroy
-  ZLocker<ZConditionLock> locker(&_lock);
+  const ZLocker<ZConditionLock> locker(&_lock);
   _queue.insert_last(page);
   _lock.notify_all();
 }
@@ -89,7 +89,7 @@ void ZUnmapper::run_service() {
 }
 
 void ZUnmapper::stop_service() {
-  ZLocker<ZConditionLock> locker(&_lock);
+  const ZLocker<ZConditionLock> locker(&_lock);
   _stop = true;
   _lock.notify_all();
 }

@@ -86,7 +86,7 @@ void ZMemoryManager::register_callbacks(const Callbacks& callbacks) {
 }
 
 zoffset ZMemoryManager::peek_low_address() const {
-  ZLocker<ZLock> locker(&_lock);
+  const ZLocker<ZLock> locker(&_lock);
 
   const ZMemory* const area = _freelist.first();
   if (area != NULL) {
@@ -98,7 +98,7 @@ zoffset ZMemoryManager::peek_low_address() const {
 }
 
 zoffset ZMemoryManager::alloc_low_address(size_t size) {
-  ZLocker<ZLock> locker(&_lock);
+  const ZLocker<ZLock> locker(&_lock);
 
   ZListIterator<ZMemory> iter(&_freelist);
   for (ZMemory* area; iter.next(&area);) {
@@ -123,7 +123,7 @@ zoffset ZMemoryManager::alloc_low_address(size_t size) {
 }
 
 zoffset ZMemoryManager::alloc_low_address_at_most(size_t size, size_t* allocated) {
-  ZLocker<ZLock> locker(&_lock);
+  const ZLocker<ZLock> locker(&_lock);
 
   ZMemory* const area = _freelist.first();
   if (area != NULL) {
@@ -149,7 +149,7 @@ zoffset ZMemoryManager::alloc_low_address_at_most(size_t size, size_t* allocated
 }
 
 zoffset ZMemoryManager::alloc_high_address(size_t size) {
-  ZLocker<ZLock> locker(&_lock);
+  const ZLocker<ZLock> locker(&_lock);
 
   ZListReverseIterator<ZMemory> iter(&_freelist);
   for (ZMemory* area; iter.next(&area);) {
@@ -176,7 +176,7 @@ void ZMemoryManager::free(zoffset start, size_t size) {
   assert(start != zoffset(UINTPTR_MAX), "Invalid address");
   const zoffset_end end = to_zoffset_end(start, size);
 
-  ZLocker<ZLock> locker(&_lock);
+  const ZLocker<ZLock> locker(&_lock);
 
   ZListIterator<ZMemory> iter(&_freelist);
   for (ZMemory* area; iter.next(&area);) {

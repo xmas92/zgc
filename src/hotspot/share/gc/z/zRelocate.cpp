@@ -121,12 +121,12 @@ void ZRelocateQueue::resize_workers(uint nworkers) {
 
   log_debug(gc, reloc)("Resize workers: %u", nworkers);
 
-  ZLocker<ZConditionLock> locker(&_lock);
+  const ZLocker<ZConditionLock> locker(&_lock);
   _nworkers = nworkers;
 }
 
 void ZRelocateQueue::leave() {
-  ZLocker<ZConditionLock> locker(&_lock);
+  const ZLocker<ZConditionLock> locker(&_lock);
   _nworkers--;
   assert(_nsynchronized <= _nworkers, "_nsynchronized: %u _nworkers: %u", _nsynchronized, _nworkers);
 
@@ -145,7 +145,7 @@ void ZRelocateQueue::leave() {
 
 void ZRelocateQueue::add_and_wait(ZForwarding* forwarding) {
   ZStatTimer timer(ZCriticalPhaseRelocationStall);
-  ZLocker<ZConditionLock> locker(&_lock);
+  const ZLocker<ZConditionLock> locker(&_lock);
 
   if (forwarding->is_done()) {
     return;
@@ -241,7 +241,7 @@ ZForwarding* ZRelocateQueue::synchronize_poll() {
   }
 
   // Slow path to get the next forwarding and/or synchronize
-  ZLocker<ZConditionLock> locker(&_lock);
+  const ZLocker<ZConditionLock> locker(&_lock);
 
   {
     ZForwarding* const forwarding = prune_and_claim();
@@ -283,7 +283,7 @@ void ZRelocateQueue::clear() {
 }
 
 void ZRelocateQueue::synchronize() {
-  ZLocker<ZConditionLock> locker(&_lock);
+  const ZLocker<ZConditionLock> locker(&_lock);
   _synchronize = true;
   inc_needs_attention();
   log_debug(gc, reloc)("Synchronize all workers 1 _nworkers: %u _nsynchronized: %u", _nworkers, _nsynchronized);
@@ -295,7 +295,7 @@ void ZRelocateQueue::synchronize() {
 }
 
 void ZRelocateQueue::desynchronize() {
-  ZLocker<ZConditionLock> locker(&_lock);
+  const ZLocker<ZConditionLock> locker(&_lock);
   _synchronize = false;
   log_debug(gc, reloc)("Desynchronize all workers _nworkers: %u _nsynchronized: %u", _nworkers, _nsynchronized);
   assert(_nsynchronized <= _nworkers, "_nsynchronized: %u _nworkers: %u", _nsynchronized, _nworkers);
@@ -500,7 +500,7 @@ public:
   }
 
   ZPage* alloc_and_retire_target_page(ZForwarding* forwarding, ZPage* target) {
-    ZLocker<ZConditionLock> locker(&_lock);
+    const ZLocker<ZConditionLock> locker(&_lock);
 
     // Wait for any ongoing in-place relocation to complete
     while (_in_place) {
@@ -533,7 +533,7 @@ public:
   void share_target_page(ZPage* page) {
     const ZPageAge age = page->age();
 
-    ZLocker<ZConditionLock> locker(&_lock);
+    const ZLocker<ZConditionLock> locker(&_lock);
     assert(_in_place, "Invalid state");
     assert(shared(age) == NULL, "Invalid state");
     assert(page != NULL, "Invalid page");

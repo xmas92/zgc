@@ -96,7 +96,7 @@ ZDriverPort::ZDriverPort() :
     _queue() {}
 
 bool ZDriverPort::is_busy() const {
-  ZLocker<ZConditionLock> locker(&_lock);
+  const ZLocker<ZConditionLock> locker(&_lock);
   return _has_message;
 }
 
@@ -105,7 +105,7 @@ void ZDriverPort::send_sync(const ZDriverRequest& message) {
 
   {
     // Enqueue message
-    ZLocker<ZConditionLock> locker(&_lock);
+    const ZLocker<ZConditionLock> locker(&_lock);
     entry.set_seqnum(_seqnum);
     _queue.insert_last(&entry);
     _lock.notify();
@@ -122,12 +122,12 @@ void ZDriverPort::send_sync(const ZDriverRequest& message) {
     // thread have returned from sem_wait(). To avoid this race we are
     // forcing the waiting thread to acquire/release the lock held by the
     // posting thread. https://sourceware.org/bugzilla/show_bug.cgi?id=12674
-    ZLocker<ZConditionLock> locker(&_lock);
+    const ZLocker<ZConditionLock> locker(&_lock);
   }
 }
 
 void ZDriverPort::send_async(const ZDriverRequest& message) {
-  ZLocker<ZConditionLock> locker(&_lock);
+  const ZLocker<ZConditionLock> locker(&_lock);
   if (!_has_message) {
     // Post message
     _message = message;
@@ -137,7 +137,7 @@ void ZDriverPort::send_async(const ZDriverRequest& message) {
 }
 
 ZDriverRequest ZDriverPort::receive() {
-  ZLocker<ZConditionLock> locker(&_lock);
+  const ZLocker<ZConditionLock> locker(&_lock);
 
   // Wait for message
   while (!_has_message && _queue.is_empty()) {
@@ -157,7 +157,7 @@ ZDriverRequest ZDriverPort::receive() {
 }
 
 void ZDriverPort::ack() {
-  ZLocker<ZConditionLock> locker(&_lock);
+  const ZLocker<ZConditionLock> locker(&_lock);
 
   if (!_has_message) {
     // Nothing to ack

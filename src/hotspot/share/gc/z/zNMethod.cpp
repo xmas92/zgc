@@ -194,7 +194,7 @@ void ZNMethod::register_nmethod(nmethod* nm) {
   // Create and attach gc data
   attach_gc_data(nm);
 
-  ZLocker<ZReentrantLock> locker(lock_for_nmethod(nm));
+  const ZLocker<ZReentrantLock> locker(lock_for_nmethod(nm));
 
   log_register(nm);
 
@@ -252,7 +252,7 @@ void ZNMethod::nmethod_patch_barriers(nmethod* nm) {
 }
 
 void ZNMethod::nmethod_oops_do(nmethod* nm, OopClosure* cl) {
-  ZLocker<ZReentrantLock> locker(lock_for_nmethod(nm));
+  const ZLocker<ZReentrantLock> locker(lock_for_nmethod(nm));
   ZNMethod::nmethod_oops_do_inner(nm, cl);
 }
 
@@ -319,7 +319,7 @@ oop ZNMethod::load_oop(oop* p, DecoratorSet decorators) {
 
   const bool keep_alive = (decorators & ON_PHANTOM_OOP_REF) != 0 &&
                           (decorators & AS_NO_KEEPALIVE) == 0;
-  ZLocker<ZReentrantLock> locker(ZNMethod::lock_for_nmethod(nm));
+  const ZLocker<ZReentrantLock> locker(ZNMethod::lock_for_nmethod(nm));
 
   // Make a local root
   zaddress_unsafe obj = *ZUncoloredRoot::cast(p);
@@ -357,12 +357,12 @@ public:
       ZNMethod::unregister_nmethod(nm);
 
       // Shared unlink
-      ZLocker<ZReentrantLock> locker(ZNMethod::lock_for_nmethod(nm));
+      const ZLocker<ZReentrantLock> locker(ZNMethod::lock_for_nmethod(nm));
       nm->unlink();
       return;
     }
 
-    ZLocker<ZReentrantLock> locker(ZNMethod::lock_for_nmethod(nm));
+    const ZLocker<ZReentrantLock> locker(ZNMethod::lock_for_nmethod(nm));
 
     if (ZNMethod::is_armed(nm)) {
       const uintptr_t prev_color = ZNMethod::color(nm);

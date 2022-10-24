@@ -183,7 +183,7 @@ void ZRelocationSet::reset(ZPageAllocator* page_allocator) {
 }
 
 void ZRelocationSet::register_flip_promoted(const ZArray<ZPage*>& pages) {
-  ZLocker<ZLock> locker(&_promotion_lock);
+  const ZLocker<ZLock> locker(&_promotion_lock);
   for (ZPage* const page : pages) {
     assert(!_flip_promoted_pages.contains(page), "no duplicates allowed");
     _flip_promoted_pages.append(page);

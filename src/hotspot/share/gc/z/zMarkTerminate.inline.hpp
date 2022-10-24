@@ -44,7 +44,7 @@ inline void ZMarkTerminate::reset(uint nworkers) {
 
 inline void ZMarkTerminate::leave() {
   SuspendibleThreadSetLeaver sts_leaver;
-  ZLocker<ZConditionLock> locker(&_lock);
+  const ZLocker<ZConditionLock> locker(&_lock);
   Atomic::store(&_nworking, _nworking - 1);
   if (_nworking == 0) {
     // Last thread leaving; notify waiters
@@ -54,7 +54,7 @@ inline void ZMarkTerminate::leave() {
 
 inline bool ZMarkTerminate::try_terminate() {
   SuspendibleThreadSetLeaver sts_leaver;
-  ZLocker<ZConditionLock> locker(&_lock);
+  const ZLocker<ZConditionLock> locker(&_lock);
   Atomic::store(&_nworking, _nworking - 1);
   if (_nworking == 0) {
     // Last thread entering termination: success
@@ -78,7 +78,7 @@ inline void ZMarkTerminate::wake_up() {
     return;
   }
 
-  ZLocker<ZConditionLock> locker(&_lock);
+  const ZLocker<ZConditionLock> locker(&_lock);
   _lock.notify();
 }
 

@@ -989,7 +989,7 @@ void ZStatMutatorAllocRate::sample_allocation(size_t allocation_bytes) {
 }
 
 ZStatMutatorAllocRateStats ZStatMutatorAllocRate::stats() {
-  ZLocker<ZLock> locker(_stat_lock);
+  const ZLocker<ZLock> locker(_stat_lock);
   return {_rate.avg(), _rate.predict_next(), _rate.sd()};
 }
 
@@ -1207,12 +1207,12 @@ ZStatCycle::ZStatCycle() :
 }
 
 void ZStatCycle::at_start() {
-  ZLocker<ZLock> locker(&_stat_lock);
+  const ZLocker<ZLock> locker(&_stat_lock);
   _start_of_last = Ticks::now();
 }
 
 void ZStatCycle::at_end(ZStatWorkers* stat_workers, bool record_stats) {
-  ZLocker<ZLock> locker(&_stat_lock);
+  const ZLocker<ZLock> locker(&_stat_lock);
   const Ticks end_of_last = _end_of_last;
   _end_of_last = Ticks::now();
 
@@ -1277,7 +1277,7 @@ double ZStatCycle::time_since_last() {
 }
 
 ZStatCycleStats ZStatCycle::stats() {
-  ZLocker<ZLock> locker(&_stat_lock);
+  const ZLocker<ZLock> locker(&_stat_lock);
 
   return {
     is_warm(),
@@ -1307,13 +1307,13 @@ ZStatWorkers::ZStatWorkers() :
     _accumulated_time() {}
 
 void ZStatWorkers::at_start(uint active_workers) {
-  ZLocker<ZLock> locker(&_stat_lock);
+  const ZLocker<ZLock> locker(&_stat_lock);
   _start_of_last = Ticks::now();
   _active_workers = active_workers;
 }
 
 void ZStatWorkers::at_end() {
-  ZLocker<ZLock> locker(&_stat_lock);
+  const ZLocker<ZLock> locker(&_stat_lock);
   const Ticks now = Ticks::now();
   const Tickspan duration = now - _start_of_last;
   Tickspan time = duration;
@@ -1353,7 +1353,7 @@ uint ZStatWorkers::active_workers() {
 }
 
 double ZStatWorkers::get_and_reset_duration() {
-  ZLocker<ZLock> locker(&_stat_lock);
+  const ZLocker<ZLock> locker(&_stat_lock);
   const double duration = _accumulated_duration.seconds();
   const Ticks now = Ticks::now();
   _accumulated_duration = now - now;
@@ -1361,7 +1361,7 @@ double ZStatWorkers::get_and_reset_duration() {
 }
 
 double ZStatWorkers::get_and_reset_time() {
-  ZLocker<ZLock> locker(&_stat_lock);
+  const ZLocker<ZLock> locker(&_stat_lock);
   const double time = _accumulated_time.seconds();
   const Ticks now = Ticks::now();
   _accumulated_time = now - now;
@@ -1369,7 +1369,7 @@ double ZStatWorkers::get_and_reset_time() {
 }
 
 ZStatWorkersStats ZStatWorkers::stats() {
-  ZLocker<ZLock> locker(&_stat_lock);
+  const ZLocker<ZLock> locker(&_stat_lock);
   return {
     accumulated_time(),
     accumulated_duration()
@@ -1654,14 +1654,14 @@ size_t ZStatHeap::reclaimed(size_t freed, size_t relocated, size_t promoted) con
 }
 
 void ZStatHeap::at_initialize(size_t min_capacity, size_t max_capacity) {
-  ZLocker<ZLock> locker(&_stat_lock);
+  const ZLocker<ZLock> locker(&_stat_lock);
 
   _at_initialize.min_capacity = min_capacity;
   _at_initialize.max_capacity = max_capacity;
 }
 
 void ZStatHeap::at_collection_start(const ZPageAllocatorStats& stats) {
-  ZLocker<ZLock> locker(&_stat_lock);
+  const ZLocker<ZLock> locker(&_stat_lock);
 
   _at_collection_start.soft_max_capacity = stats.soft_max_capacity();
   _at_collection_start.capacity = stats.capacity();
@@ -1671,7 +1671,7 @@ void ZStatHeap::at_collection_start(const ZPageAllocatorStats& stats) {
 }
 
 void ZStatHeap::at_mark_start(const ZPageAllocatorStats& stats) {
-  ZLocker<ZLock> locker(&_stat_lock);
+  const ZLocker<ZLock> locker(&_stat_lock);
 
   _at_mark_start.soft_max_capacity = stats.soft_max_capacity();
   _at_mark_start.capacity = stats.capacity();
@@ -1681,7 +1681,7 @@ void ZStatHeap::at_mark_start(const ZPageAllocatorStats& stats) {
 }
 
 void ZStatHeap::at_mark_end(const ZPageAllocatorStats& stats) {
-  ZLocker<ZLock> locker(&_stat_lock);
+  const ZLocker<ZLock> locker(&_stat_lock);
 
   _at_mark_end.capacity = stats.capacity();
   _at_mark_end.free = free(stats.used());
@@ -1691,7 +1691,7 @@ void ZStatHeap::at_mark_end(const ZPageAllocatorStats& stats) {
 }
 
 void ZStatHeap::at_select_relocation_set(const ZRelocationSetSelectorStats& stats) {
-  ZLocker<ZLock> locker(&_stat_lock);
+  const ZLocker<ZLock> locker(&_stat_lock);
 
   size_t live = 0;
   for (uint i = 0; i <= ZPageAgeMax; ++i) {
@@ -1703,7 +1703,7 @@ void ZStatHeap::at_select_relocation_set(const ZRelocationSetSelectorStats& stat
 }
 
 void ZStatHeap::at_relocate_start(const ZPageAllocatorStats& stats) {
-  ZLocker<ZLock> locker(&_stat_lock);
+  const ZLocker<ZLock> locker(&_stat_lock);
 
   assert(stats.compacted() == 0, "Nothing should have been compacted");
 
@@ -1720,7 +1720,7 @@ void ZStatHeap::at_relocate_start(const ZPageAllocatorStats& stats) {
 }
 
 void ZStatHeap::at_relocate_end(const ZPageAllocatorStats& stats, bool record_stats) {
-  ZLocker<ZLock> locker(&_stat_lock);
+  const ZLocker<ZLock> locker(&_stat_lock);
 
   _at_relocate_end.capacity = stats.capacity();
   _at_relocate_end.capacity_high = capacity_high();
@@ -1773,7 +1773,7 @@ size_t ZStatHeap::used_at_collection_end() const {
 }
 
 ZStatHeapStats ZStatHeap::stats() {
-  ZLocker<ZLock> locker(&_stat_lock);
+  const ZLocker<ZLock> locker(&_stat_lock);
 
   return {
     live_at_mark_end(),

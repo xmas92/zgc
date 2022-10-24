@@ -77,7 +77,7 @@ public:
   virtual bool has_dead_oop(CompiledMethod* method) const {
     nmethod* const nm = method->as_nmethod();
     ZReentrantLock* const lock = ZNMethod::lock_for_nmethod(nm);
-    ZLocker<ZReentrantLock> locker(lock);
+    const ZLocker<ZReentrantLock> locker(lock);
     if (!ZNMethod::is_armed(nm)) {
       // Disarmed nmethods are alive
       return false;

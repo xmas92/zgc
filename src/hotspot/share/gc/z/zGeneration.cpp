@@ -1308,7 +1308,7 @@ public:
       _bs_nm(static_cast<ZBarrierSetNMethod*>(BarrierSet::barrier_set()->barrier_set_nmethod())) {}
 
   virtual void do_nmethod(nmethod* nm) {
-    ZLocker<ZReentrantLock> locker(ZNMethod::lock_for_nmethod(nm));
+    const ZLocker<ZReentrantLock> locker(ZNMethod::lock_for_nmethod(nm));
     if (_bs_nm->is_armed(nm)) {
       // Heal barriers
       ZNMethod::nmethod_patch_barriers(nm);

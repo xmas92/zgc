@@ -71,18 +71,18 @@ uint ZWorkers::active_workers() const {
 
 void ZWorkers::set_active_workers(uint nworkers) {
   log_info(gc, task)("Using %u Workers for %s Generation", nworkers, _generation_name);
-  ZLocker<ZLock> locker(&_resize_lock);
+  const ZLocker<ZLock> locker(&_resize_lock);
   _workers.set_active_workers(nworkers);
 }
 
 void ZWorkers::set_active() {
-  ZLocker<ZLock> locker(&_resize_lock);
+  const ZLocker<ZLock> locker(&_resize_lock);
   _is_active = true;
   _requested_nworkers = 0;
 }
 
 void ZWorkers::set_inactive() {
-  ZLocker<ZLock> locker(&_resize_lock);
+  const ZLocker<ZLock> locker(&_resize_lock);
   _is_active = false;
 }
 
@@ -90,14 +90,14 @@ void ZWorkers::run(ZTask* task) {
   log_debug(gc, task)("Executing %s using %s with %u workers", task->name(), _workers.name(), active_workers());
 
   {
-    ZLocker<ZLock> locker(&_resize_lock);
+    const ZLocker<ZLock> locker(&_resize_lock);
     _stats->at_start(active_workers());
   }
 
   _workers.run_task(task->worker_task());
 
   {
-    ZLocker<ZLock> locker(&_resize_lock);
+    const ZLocker<ZLock> locker(&_resize_lock);
     _stats->at_end();
   }
 }
@@ -107,7 +107,7 @@ void ZWorkers::run(ZRestartableTask* task) {
     // Run task
     run(static_cast<ZTask*>(task));
 
-    ZLocker<ZLock> locker(&_resize_lock);
+    const ZLocker<ZLock> locker(&_resize_lock);
     if (_requested_nworkers == 0) {
       // Task completed
       return;
@@ -144,7 +144,7 @@ ZLock* ZWorkers::resizing_lock() {
 void ZWorkers::request_resize_workers(uint nworkers) {
   assert(nworkers != 0, "Never ask for zero workers");
 
-  ZLocker<ZLock> locker(&_resize_lock);
+  const ZLocker<ZLock> locker(&_resize_lock);
 
   if (_requested_nworkers == nworkers) {
     // Already requested

@@ -562,7 +562,7 @@ static GCCause::Cause make_major_gc_decision(ZDirectorStats& stats) {
 }
 
 static ZWorkerResizeStats sample_worker_resize_stats(ZStatCycleStats& cycle_stats, ZStatWorkersStats& worker_stats, ZWorkers* workers) {
-  ZLocker<ZLock> locker(workers->resizing_lock());
+  const ZLocker<ZLock> locker(workers->resizing_lock());
 
   if (!workers->is_active()) {
     // If the workers are not active, it isn't safe to read stats
@@ -740,14 +740,14 @@ static bool start_gc(ZDirectorStats& stats) {
 }
 
 void ZDirector::evaluate_rules() {
-  ZLocker<ZConditionLock> locker(&_director->_monitor);
+  const ZLocker<ZConditionLock> locker(&_director->_monitor);
   _director->_monitor.notify();
 }
 
 bool ZDirector::wait_for_tick() {
   const uint64_t interval_ms = MILLIUNITS / decision_hz;
 
-  ZLocker<ZConditionLock> locker(&_monitor);
+  const ZLocker<ZConditionLock> locker(&_monitor);
 
   if (_stopped) {
     // Stopped
@@ -823,7 +823,7 @@ void ZDirector::run_service() {
 }
 
 void ZDirector::stop_service() {
-  ZLocker<ZConditionLock> locker(&_monitor);
+  const ZLocker<ZConditionLock> locker(&_monitor);
   _stopped = true;
   _monitor.notify();
 }

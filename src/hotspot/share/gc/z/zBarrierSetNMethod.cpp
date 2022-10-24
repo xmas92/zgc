@@ -37,7 +37,7 @@
 #include "runtime/threadWXSetters.inline.hpp"
 
 bool ZBarrierSetNMethod::nmethod_entry_barrier(nmethod* nm) {
-  ZLocker<ZReentrantLock> locker(ZNMethod::lock_for_nmethod(nm));
+  const ZLocker<ZReentrantLock> locker(ZNMethod::lock_for_nmethod(nm));
   log_trace(nmethod, barrier)("Entered critical zone for %p", nm);
 
   log_trace(gc, nmethod)("nmethod: " PTR_FORMAT " visited by entry (try)", p2i(nm));

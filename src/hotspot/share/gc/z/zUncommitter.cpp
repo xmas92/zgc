@@ -41,7 +41,7 @@ ZUncommitter::ZUncommitter(ZPageAllocator* page_allocator) :
 }
 
 bool ZUncommitter::wait(uint64_t timeout) const {
-  ZLocker<ZConditionLock> locker(&_lock);
+  const ZLocker<ZConditionLock> locker(&_lock);
   while (!ZUncommit && !_stop) {
     _lock.wait();
   }
@@ -55,7 +55,7 @@ bool ZUncommitter::wait(uint64_t timeout) const {
 }
 
 bool ZUncommitter::should_continue() const {
-  ZLocker<ZConditionLock> locker(&_lock);
+  const ZLocker<ZConditionLock> locker(&_lock);
   return !_stop;
 }
 
@@ -90,7 +90,7 @@ void ZUncommitter::run_service() {
 }
 
 void ZUncommitter::stop_service() {
-  ZLocker<ZConditionLock> locker(&_lock);
+  const ZLocker<ZConditionLock> locker(&_lock);
   _stop = true;
   _lock.notify_all();
 }

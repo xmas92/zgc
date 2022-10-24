@@ -121,7 +121,7 @@ void ZForwarding::in_place_relocation_claim_page() {
     // If the previous reference count was 1, then we just changed it to -1,
     // and we have now claimed the page. Otherwise we wait until it is claimed.
     if (ref_count != 1) {
-      ZLocker<ZConditionLock> locker(&_ref_lock);
+      const ZLocker<ZConditionLock> locker(&_ref_lock);
       while (Atomic::load_acquire(&_ref_count) != -1) {
         _ref_lock.wait();
       }
@@ -147,7 +147,7 @@ void ZForwarding::release_page() {
       // it to 0 and we should signal that the page is now released.
       if (ref_count == 1) {
         // Notify released
-        ZLocker<ZConditionLock> locker(&_ref_lock);
+        const ZLocker<ZConditionLock> locker(&_ref_lock);
         _ref_lock.notify_all();
       }
     } else {
@@ -160,7 +160,7 @@ void ZForwarding::release_page() {
       // to -1 or 0, and we should signal the that page is now claimed or released.
       if (ref_count == -2 || ref_count == -1) {
         // Notify claimed or released
-        ZLocker<ZConditionLock> locker(&_ref_lock);
+        const ZLocker<ZConditionLock> locker(&_ref_lock);
         _ref_lock.notify_all();
       }
     }
@@ -172,7 +172,7 @@ void ZForwarding::release_page() {
 ZPage* ZForwarding::detach_page() {
   // Wait until released
   if (Atomic::load_acquire(&_ref_count) != 0) {
-    ZLocker<ZConditionLock> locker(&_ref_lock);
+    const ZLocker<ZConditionLock> locker(&_ref_lock);
     while (Atomic::load_acquire(&_ref_count) != 0) {
       _ref_lock.wait();
     }

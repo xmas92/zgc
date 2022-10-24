@@ -61,7 +61,7 @@ void ZJNICritical::block() {
 
     if (count < 0) {
       // Already blocked, wait until unblocked
-      ZLocker<ZConditionLock> locker(_lock);
+      const ZLocker<ZConditionLock> locker(_lock);
       while (Atomic::load_acquire(&_count) < 0) {
         _lock->wait();
       }
@@ -80,7 +80,7 @@ void ZJNICritical::block() {
     // threads have exited the critical region.
     if (count != 0) {
       // Wait until blocked
-      ZLocker<ZConditionLock> locker(_lock);
+      const ZLocker<ZConditionLock> locker(_lock);
       while (Atomic::load_acquire(&_count) != -1) {
         _lock->wait();
       }
@@ -96,7 +96,7 @@ void ZJNICritical::unblock() {
   assert(count == -1, "Invalid count");
 
   // Notify unblocked
-  ZLocker<ZConditionLock> locker(_lock);
+  const ZLocker<ZConditionLock> locker(_lock);
   Atomic::release_store(&_count, (int64_t)0);
   _lock->notify_all();
 }
@@ -112,7 +112,7 @@ void ZJNICritical::enter_inner(JavaThread* thread) {
       // Transition thread to blocked before locking to avoid deadlock
       ThreadBlockInVM tbivm(thread);
 
-      ZLocker<ZConditionLock> locker(_lock);
+      const ZLocker<ZConditionLock> locker(_lock);
       while (Atomic::load_acquire(&_count) < 0) {
         _lock->wait();
       }
@@ -162,7 +162,7 @@ void ZJNICritical::exit_inner() {
       // critical region and we are now blocked.
       if (count == -2) {
         // Nofity blocked
-        ZLocker<ZConditionLock> locker(_lock);
+        const ZLocker<ZConditionLock> locker(_lock);
         _lock->notify_all();
       }
     }

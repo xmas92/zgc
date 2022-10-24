@@ -300,7 +300,7 @@ ZHeapIteratorBitMap* ZHeapIterator::object_bitmap(oop obj) {
   const zoffset offset = ZAddress::offset(to_zaddress(obj));
   ZHeapIteratorBitMap* bitmap = _bitmaps.get_acquire(offset);
   if (bitmap == NULL) {
-    ZLocker<ZLock> locker(&_bitmaps_lock);
+    const ZLocker<ZLock> locker(&_bitmaps_lock);
     bitmap = _bitmaps.get(offset);
     if (bitmap == NULL) {
       // Install new bitmap

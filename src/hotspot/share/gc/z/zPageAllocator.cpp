@@ -318,7 +318,7 @@ size_t ZPageAllocator::unused() const {
 }
 
 ZPageAllocatorStats ZPageAllocator::stats(ZGeneration* generation) const {
-  ZLocker<ZLock> locker(&_lock);
+  const ZLocker<ZLock> locker(&_lock);
   return ZPageAllocatorStats(_min_capacity,
                              _max_capacity,
                              soft_max_capacity(),
@@ -537,7 +537,7 @@ bool ZPageAllocator::alloc_page_stall(ZPageAllocation* allocation) {
     // thread have returned from sem_wait(). To avoid this race we are
     // forcing the waiting thread to acquire/release the lock held by the
     // posting thread. https://sourceware.org/bugzilla/show_bug.cgi?id=12674
-    ZLocker<ZLock> locker(&_lock);
+    const ZLocker<ZLock> locker(&_lock);
   }
 
   // Send event
@@ -548,7 +548,7 @@ bool ZPageAllocator::alloc_page_stall(ZPageAllocation* allocation) {
 
 bool ZPageAllocator::alloc_page_or_stall(ZPageAllocation* allocation) {
   {
-    ZLocker<ZLock> locker(&_lock);
+    const ZLocker<ZLock> locker(&_lock);
 
     if (alloc_page_common(allocation)) {
       // Success
@@ -777,7 +777,7 @@ void ZPageAllocator::free_page(ZPage* page) {
   const ZGenerationId generation_id = page->generation_id();
   ZPage* const to_recycle = _safe_recycle.register_and_clone_if_activated(page);
 
-  ZLocker<ZLock> locker(&_lock);
+  const ZLocker<ZLock> locker(&_lock);
 
   // Update used statistics
   const size_t size = to_recycle->size();
@@ -807,7 +807,7 @@ void ZPageAllocator::free_pages(const ZArray<ZPage*>* pages) {
     to_recycle.push(_safe_recycle.register_and_clone_if_activated(page));
   }
 
-  ZLocker<ZLock> locker(&_lock);
+  const ZLocker<ZLock> locker(&_lock);
 
   // Update used statistics
   decrease_used(young_size + old_size);
@@ -832,7 +832,7 @@ void ZPageAllocator::free_pages_alloc_failed(ZPageAllocation* allocation) {
     to_recycle.push(_safe_recycle.register_and_clone_if_activated(page));
   }
 
-  ZLocker<ZLock> locker(&_lock);
+  const ZLocker<ZLock> locker(&_lock);
 
   // Only decrease the overall used and not the generation used,
   // since the allocation failed and generation used wasn't bumped.
@@ -863,7 +863,7 @@ size_t ZPageAllocator::uncommit(uint64_t* timeout) {
 
   {
     SuspendibleThreadSetJoiner joiner;
-    ZLocker<ZLock> locker(&_lock);
+    const ZLocker<ZLock> locker(&_lock);
 
     // Never uncommit below min capacity. We flush out and uncommit chunks at
     // a time (~0.8% of the max capacity, but at least one granule and at most
@@ -894,7 +894,7 @@ size_t ZPageAllocator::uncommit(uint64_t* timeout) {
 
   {
     SuspendibleThreadSetJoiner joiner;
-    ZLocker<ZLock> locker(&_lock);
+    const ZLocker<ZLock> locker(&_lock);
 
     // Adjust claimed and capacity to reflect the uncommit
     Atomic::sub(&_claimed, flushed);
@@ -929,7 +929,7 @@ static bool has_alloc_seen_old(const ZPageAllocation* allocation) {
 }
 
 bool ZPageAllocator::is_alloc_stalling_for_old() const {
-  ZLocker<ZLock> locker(&_lock);
+  const ZLocker<ZLock> locker(&_lock);
 
   ZPageAllocation* const allocation = _stalled.first();
   if (allocation == NULL) {
@@ -973,12 +973,12 @@ void ZPageAllocator::restart_gc() const {
 }
 
 void ZPageAllocator::handle_alloc_stalling_for_young() {
-  ZLocker<ZLock> locker(&_lock);
+  const ZLocker<ZLock> locker(&_lock);
   restart_gc();
 }
 
 void ZPageAllocator::handle_alloc_stalling_for_old() {
-  ZLocker<ZLock> locker(&_lock);
+  const ZLocker<ZLock> locker(&_lock);
   notify_out_of_memory();
   restart_gc();
 }

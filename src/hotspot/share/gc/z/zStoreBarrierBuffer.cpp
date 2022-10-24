@@ -113,7 +113,7 @@ void ZStoreBarrierBuffer::install_base_pointers() {
   }
 
   // Use a lock since both the GC and the Java thread race to install the base pointers
-  ZLocker<ZLock> locker(&_base_pointer_lock);
+  const ZLocker<ZLock> locker(&_base_pointer_lock);
 
   const bool should_install_base_pointers = ZPointer::remap_bits(_last_installed_color) != ZPointerRemapped;
 

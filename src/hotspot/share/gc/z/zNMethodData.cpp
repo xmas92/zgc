@@ -54,7 +54,7 @@ bool ZNMethodData::has_non_immediate_oops() const {
 void ZNMethodData::swap(ZArray<ZNMethodDataBarrier>* barriers,
                         ZArray<oop*>* immediate_oops,
                         bool has_non_immediate_oops) {
-  ZLocker<ZReentrantLock> locker(&_lock);
+  const ZLocker<ZReentrantLock> locker(&_lock);
   _barriers.swap(barriers);
   _immediate_oops.swap(immediate_oops);
   _has_non_immediate_oops = has_non_immediate_oops;
