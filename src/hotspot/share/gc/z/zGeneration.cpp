@@ -427,8 +427,8 @@ public:
 
   virtual void doit() {
     // Setup GC id and active marker
-    GCIdMark gc_id_mark(_gc_id);
-    IsGCActiveMark gc_active_mark;
+    const GCIdMark gc_id_mark(_gc_id);
+    const IsGCActiveMark gc_active_mark;
 
     // Verify before operation
     ZVerify::before_zoperation();
