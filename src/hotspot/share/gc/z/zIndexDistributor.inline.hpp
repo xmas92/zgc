@@ -94,6 +94,7 @@ private:
 
   // Describes the how the number of indices increases when going up from the given level
   static constexpr int level_multiplier(int level) {
+    assert(level >= 0, "Must be");
     assert(level < ClaimLevels, "Must be");
     constexpr int array[ClaimLevels]{16, 16, 16};
     return array[level];
