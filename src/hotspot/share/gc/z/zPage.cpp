@@ -287,7 +287,7 @@ void* ZPage::remset_current() {
 }
 
 void ZPage::log_msg(const char* msg_format, ...) const {
-  LogTarget(Trace, gc, page) target;
+  const LogTarget(Trace, gc, page) target;
   if (target.is_enabled()) {
     va_list argp;
     va_start(argp, msg_format);

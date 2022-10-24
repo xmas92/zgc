@@ -129,7 +129,7 @@ void ZMark::start() {
   _generation->stat_mark()->at_mark_start(nstripes);
 
   // Print worker/stripe distribution
-  LogTarget(Debug, gc, marking) log;
+  const LogTarget(Debug, gc, marking) log;
   if (log.is_enabled()) {
     log.print("Mark Worker/Stripe Distribution");
     for (uint worker_id = 0; worker_id < _nworkers; worker_id++) {

@@ -740,7 +740,7 @@ const Tickspan& ZStatPhasePause::max() {
 void ZStatPhasePause::register_start(ConcurrentGCTimer* timer, const Ticks& start) const {
   timer->register_gc_pause_start(name(), start);
 
-  LogTarget(Debug, gc, phases, start) log;
+  const LogTarget(Debug, gc, phases, start) log;
   log_start(log);
 }
 
@@ -758,7 +758,7 @@ void ZStatPhasePause::register_end(ConcurrentGCTimer* timer, const Ticks& start,
   // Track minimum mutator utilization
   ZStatMMU::register_pause(start, end);
 
-  LogTarget(Info, gc, phases) log;
+  const LogTarget(Info, gc, phases) log;
   log_end(log, duration);
 }
 
@@ -768,7 +768,7 @@ ZStatPhaseConcurrent::ZStatPhaseConcurrent(const char* name, ZGenerationId id) :
 void ZStatPhaseConcurrent::register_start(ConcurrentGCTimer* timer, const Ticks& start) const {
   timer->register_gc_concurrent_start(name(), start);
 
-  LogTarget(Debug, gc, phases, start) log;
+  const LogTarget(Debug, gc, phases, start) log;
   log_start(log);
 }
 
@@ -782,7 +782,7 @@ void ZStatPhaseConcurrent::register_end(ConcurrentGCTimer* timer, const Ticks& s
   const Tickspan duration = end - start;
   ZStatSample(_sampler, duration.value());
 
-  LogTarget(Info, gc, phases) log;
+  const LogTarget(Info, gc, phases) log;
   log_end(log, duration);
 }
 
@@ -796,10 +796,10 @@ void ZStatSubPhase::register_start(ConcurrentGCTimer* timer, const Ticks& start)
   }
 
   if (Thread::current()->is_Worker_thread()) {
-    LogTarget(Trace, gc, phases, start) log;
+    const LogTarget(Trace, gc, phases, start) log;
     log_start(log, true /* thread */);
   } else {
-    LogTarget(Debug, gc, phases, start) log;
+    const LogTarget(Debug, gc, phases, start) log;
     log_start(log, false /* thread */);
   }
 }
@@ -820,10 +820,10 @@ void ZStatSubPhase::register_end(ConcurrentGCTimer* timer, const Ticks& start, c
   ZStatSample(_sampler, duration.value());
 
   if (Thread::current()->is_Worker_thread()) {
-    LogTarget(Trace, gc, phases) log;
+    const LogTarget(Trace, gc, phases) log;
     log_end(log, duration, true /* thread */);
   } else {
-    LogTarget(Debug, gc, phases) log;
+    const LogTarget(Debug, gc, phases) log;
     log_end(log, duration, false /* thread */);
   }
 }
@@ -848,10 +848,10 @@ void ZStatCriticalPhase::register_end(ConcurrentGCTimer* timer, const Ticks& sta
   ZStatInc(_counter);
 
   if (_verbose) {
-    LogTarget(Info, gc) log;
+    const LogTarget(Info, gc) log;
     log_end(log, duration, true /* thread */);
   } else {
-    LogTarget(Debug, gc) log;
+    const LogTarget(Debug, gc) log;
     log_end(log, duration, true /* thread */);
   }
 }
@@ -1046,7 +1046,7 @@ void ZStat::print(LogTargetHandle log, const ZStatSamplerHistory* history) const
 
 void ZStat::run_service() {
   ZStatSamplerHistory* const history = new ZStatSamplerHistory[ZStatSampler::count()];
-  LogTarget(Info, gc, stats) log;
+  const LogTarget(Info, gc, stats) log;
 
   ZStatSampler::sort();
 

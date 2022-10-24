@@ -105,7 +105,7 @@ ZReentrantLock* ZNMethod::lock_for_nmethod(nmethod* nm) {
 }
 
 void ZNMethod::log_register(const nmethod* nm) {
-  LogTarget(Debug, gc, nmethod) log;
+  const LogTarget(Debug, gc, nmethod) log;
   if (!log.is_enabled()) {
     return;
   }
@@ -127,7 +127,7 @@ void ZNMethod::log_register(const nmethod* nm) {
             data->immediate_oops()->length(),
             data->has_non_immediate_oops() ? "Yes" : "No");
 
-  LogTarget(Trace, gc, nmethod, barrier) log_barriers;
+  const LogTarget(Trace, gc, nmethod, barrier) log_barriers;
   if (log_barriers.is_enabled()) {
     // Print nmethod barriers
     ZArrayIterator<ZNMethodDataBarrier> iter(data->barriers());
@@ -137,7 +137,7 @@ void ZNMethod::log_register(const nmethod* nm) {
     }
   }
 
-  LogTarget(Trace, gc, nmethod, oops) log_oops;
+  const LogTarget(Trace, gc, nmethod, oops) log_oops;
   if (log_oops.is_enabled()) {
     // Print nmethod oops table
     oop* const begin = nm->oops_begin();
@@ -159,7 +159,7 @@ void ZNMethod::log_register(const nmethod* nm) {
 }
 
 void ZNMethod::log_unregister(const nmethod* nm) {
-  LogTarget(Debug, gc, nmethod) log;
+  const LogTarget(Debug, gc, nmethod) log;
   if (!log.is_enabled()) {
     return;
   }
@@ -175,7 +175,7 @@ void ZNMethod::log_unregister(const nmethod* nm) {
 }
 
 void ZNMethod::log_purge(const nmethod* nm) {
-  LogTarget(Debug, gc, nmethod) log;
+  const LogTarget(Debug, gc, nmethod) log;
   if (!log.is_enabled()) {
     return;
   }
