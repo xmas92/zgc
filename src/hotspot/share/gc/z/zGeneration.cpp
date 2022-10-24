@@ -510,7 +510,7 @@ bool ZGenerationYoung::should_record_stats() {
 }
 
 void ZGenerationYoung::collect(ZYoungType type, ConcurrentGCTimer* timer) {
-  ZGenerationCollectionScopeYoung scope(type, timer);
+  const ZGenerationCollectionScopeYoung scope(type, timer);
 
   // Phase 1: Pause Mark Start
   pause_mark_start();
@@ -895,7 +895,7 @@ bool ZGenerationOld::should_record_stats() {
 }
 
 void ZGenerationOld::collect(ConcurrentGCTimer* timer) {
-  ZGenerationCollectionScopeOld scope(timer);
+  const ZGenerationCollectionScopeOld scope(timer);
 
   // Phase 1: Concurrent Mark
   concurrent_mark();
