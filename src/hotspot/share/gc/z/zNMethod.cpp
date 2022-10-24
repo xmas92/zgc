@@ -415,7 +415,7 @@ public:
   }
 
   virtual void work() {
-    ICRefillVerifierMark mark(_verifier);
+    const ICRefillVerifierMark mark(_verifier);
     ZNMethodTable::nmethods_do(false /* secondary */, &_cl);
   }
 
