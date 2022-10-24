@@ -934,7 +934,7 @@ void ZGenerationOld::collect(ConcurrentGCTimer* timer) {
   abortpoint();
 
   {
-    ZDriverLocker locker;
+    const ZDriverLocker locker;
 
     // Phase 8: Concurrent Remap Roots
     concurrent_remap_roots();
@@ -987,7 +987,7 @@ public:
 };
 
 bool ZGenerationOld::pause_mark_end() {
-  ZDriverLocker locker;
+  const ZDriverLocker locker;
   return VM_ZMarkEndOld().pause();
 }
 
@@ -1041,7 +1041,7 @@ void ZGenerationOld::pause_verify() {
   // young collections during this verification.
   if (ZVerifyRoots || ZVerifyObjects) {
     // Limited verification
-    ZDriverLocker locker;
+    const ZDriverLocker locker;
     VM_ZVerifyOld().pause();
   }
 }

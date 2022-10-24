@@ -200,7 +200,7 @@ void ZDriverMinor::run_service() {
     // Wait for GC request
     const ZDriverRequest request = _port.receive();
 
-    ZDriverLocker locker;
+    const ZDriverLocker locker;
 
     abortpoint();
 
@@ -433,7 +433,7 @@ void ZDriverMajor::run_service() {
     // Wait for GC request
     const ZDriverRequest request = _port.receive();
 
-    ZDriverLocker locker;
+    const ZDriverLocker locker;
 
     ZBreakpoint::at_before_gc();
 
