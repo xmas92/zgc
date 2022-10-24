@@ -182,7 +182,7 @@ public:
 };
 
 void ZDriverMinor::gc(const ZDriverRequest& request) {
-  ZDriverScopeMinor scope(request, &_gc_timer);
+  const ZDriverScopeMinor scope(request, &_gc_timer);
   ZGeneration::young()->collect(ZYoungType::minor, &_gc_timer);
 }
 
@@ -393,7 +393,7 @@ public:
 };
 
 void ZDriverMajor::gc(const ZDriverRequest& request) {
-  ZDriverScopeMajor scope(request, &_gc_timer);
+  const ZDriverScopeMajor scope(request, &_gc_timer);
 
   if (should_preclean_young(request.cause())) {
     // Collect young generation and promote everything to old generation
