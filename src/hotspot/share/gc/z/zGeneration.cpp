@@ -566,7 +566,7 @@ public:
 
   virtual bool do_operation() {
     const ZStatTimerYoung timer(ZPhasePauseMarkStartYoungAndOld);
-    ZServiceabilityPauseTracer tracer;
+    const ZServiceabilityPauseTracer tracer;
 
     ZCollectedHeap::heap()->increment_total_collections(true /* full */);
     ZGeneration::young()->mark_start();
@@ -587,7 +587,7 @@ public:
 
   virtual bool do_operation() {
     const ZStatTimerYoung timer(ZPhasePauseMarkStartYoung);
-    ZServiceabilityPauseTracer tracer;
+    const ZServiceabilityPauseTracer tracer;
 
     ZCollectedHeap::heap()->increment_total_collections(false /* full */);
     ZGeneration::young()->mark_start();
@@ -630,7 +630,7 @@ public:
 
   virtual bool do_operation() {
     const ZStatTimerYoung timer(ZPhasePauseMarkEndYoung);
-    ZServiceabilityPauseTracer tracer;
+    const ZServiceabilityPauseTracer tracer;
     return ZGeneration::young()->mark_end();
   }
 };
@@ -729,7 +729,7 @@ public:
 
   virtual bool do_operation() {
     const ZStatTimerYoung timer(ZPhasePauseRelocateStartYoung);
-    ZServiceabilityPauseTracer tracer;
+    const ZServiceabilityPauseTracer tracer;
     ZGeneration::young()->relocate_start();
     return true;
   }
@@ -981,7 +981,7 @@ public:
 
   virtual bool do_operation() {
     const ZStatTimerOld timer(ZPhasePauseMarkEndOld);
-    ZServiceabilityPauseTracer tracer;
+    const ZServiceabilityPauseTracer tracer;
     return ZGeneration::old()->mark_end();
   }
 };
@@ -1063,7 +1063,7 @@ public:
 
   virtual bool do_operation() {
     const ZStatTimerOld timer(ZPhasePauseRelocateStartOld);
-    ZServiceabilityPauseTracer tracer;
+    const ZServiceabilityPauseTracer tracer;
     ZGeneration::old()->relocate_start();
     return true;
   }
