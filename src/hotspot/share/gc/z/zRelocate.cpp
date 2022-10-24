@@ -255,7 +255,7 @@ ZForwarding* ZRelocateQueue::synchronize_poll() {
     return NULL;
   }
 
-  ZRelocateQueueSynchronizeThread rqst(this);
+  const ZRelocateQueueSynchronizeThread rqst(this);
 
   do {
     _lock.wait();
