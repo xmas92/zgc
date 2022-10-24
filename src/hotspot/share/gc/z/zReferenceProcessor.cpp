@@ -92,7 +92,7 @@ static void reference_set_next(zaddress reference, zaddress next) {
 }
 
 static void soft_reference_update_clock() {
-  SuspendibleThreadSetJoiner sts_joiner;
+  const SuspendibleThreadSetJoiner sts_joiner;
   const jlong now = os::javaTimeNanos() / NANOSECS_PER_MILLISEC;
   java_lang_ref_SoftReference::set_clock(now);
 }
@@ -324,7 +324,7 @@ void ZReferenceProcessor::process_worker_discovered_list(zaddress discovered_lis
 }
 
 void ZReferenceProcessor::work() {
-  SuspendibleThreadSetJoiner sts_joiner;
+  const SuspendibleThreadSetJoiner sts_joiner;
 
   ZPerWorkerIterator<zaddress> iter(&_discovered_list);
   for (zaddress* start; iter.next(&start);) {
@@ -449,7 +449,7 @@ void ZReferenceProcessor::process_references() {
 
 void ZReferenceProcessor::verify_pending_references() {
 #ifdef ASSERT
-  SuspendibleThreadSetJoiner sts_joiner;
+  const SuspendibleThreadSetJoiner sts_joiner;
 
   assert(!is_null(_pending_list.get()), "Should not contain colored null");
 
@@ -490,7 +490,7 @@ void ZReferenceProcessor::enqueue_references() {
   {
     // Heap_lock protects external pending list
     MonitorLocker ml(Heap_lock);
-    SuspendibleThreadSetJoiner sts_joiner;
+    const SuspendibleThreadSetJoiner sts_joiner;
 
     const zaddress prev_list = swap_pending_list(_pending_list.get());
 

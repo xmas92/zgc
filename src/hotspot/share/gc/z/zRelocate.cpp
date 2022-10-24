@@ -1202,7 +1202,7 @@ public:
       _iter(pages) {}
 
   virtual void work() {
-    SuspendibleThreadSetJoiner sts_joiner;
+    const SuspendibleThreadSetJoiner sts_joiner;
 
     for (ZPage* page; _iter.next(&page);) {
       page->object_iterate([&](oop obj) {
@@ -1229,7 +1229,7 @@ public:
       _iter(ZGeneration::young()->relocation_set_parallel_iterator()) {}
 
   virtual void work() {
-    SuspendibleThreadSetJoiner sts_joiner;
+    const SuspendibleThreadSetJoiner sts_joiner;
 
     for (ZForwarding* forwarding; _iter.next(&forwarding);) {
       if (forwarding->to_age() == ZPageAge::old) {
@@ -1294,7 +1294,7 @@ public:
       _iter(pages) {}
 
   virtual void work() {
-    SuspendibleThreadSetJoiner sts_joiner;
+    const SuspendibleThreadSetJoiner sts_joiner;
     ZArray<ZPage*> promoted_pages;
 
     for (ZPage* prev_page; _iter.next(&prev_page);) {

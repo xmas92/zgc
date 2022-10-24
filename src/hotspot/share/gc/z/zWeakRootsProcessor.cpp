@@ -63,7 +63,7 @@ public:
   }
 
   virtual void work() {
-    SuspendibleThreadSetJoiner sts_joiner;
+    const SuspendibleThreadSetJoiner sts_joiner;
     ZPhantomCleanOopClosure cl;
     _roots_weak_colored.apply(&cl);
   }

@@ -582,7 +582,7 @@ bool ZMark::try_proactive_flush() {
 
   Atomic::inc(&_work_nproactiveflush);
 
-  SuspendibleThreadSetLeaver sts_leaver;
+  const SuspendibleThreadSetLeaver sts_leaver;
   return flush(false /* gc_threads */);
 }
 
@@ -595,7 +595,7 @@ void ZMark::leave() {
 }
 
 void ZMark::work() {
-  SuspendibleThreadSetJoiner sts_joiner;
+  const SuspendibleThreadSetJoiner sts_joiner;
   ZMarkStripe* const stripe = _stripes.stripe_for_worker(_nworkers, WorkerThread::worker_id());
   ZMarkThreadLocalStacks* const stacks = ZThreadLocalData::mark_stacks(Thread::current(), _generation->id());
   ZMarkContext context(ZMarkStripesMax, stripe, stacks);
@@ -884,7 +884,7 @@ void ZMark::resize_workers(uint nworkers) {
 }
 
 void ZMark::mark_roots() {
-  SuspendibleThreadSetJoiner sts_joiner;
+  const SuspendibleThreadSetJoiner sts_joiner;
 
   if (_generation->is_old()) {
     ZMarkOldRootsTask task(this);

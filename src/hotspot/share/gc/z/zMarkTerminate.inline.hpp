@@ -43,7 +43,7 @@ inline void ZMarkTerminate::reset(uint nworkers) {
 }
 
 inline void ZMarkTerminate::leave() {
-  SuspendibleThreadSetLeaver sts_leaver;
+  const SuspendibleThreadSetLeaver sts_leaver;
   const ZLocker<ZConditionLock> locker(&_lock);
   Atomic::store(&_nworking, _nworking - 1);
   if (_nworking == 0) {
@@ -53,7 +53,7 @@ inline void ZMarkTerminate::leave() {
 }
 
 inline bool ZMarkTerminate::try_terminate() {
-  SuspendibleThreadSetLeaver sts_leaver;
+  const SuspendibleThreadSetLeaver sts_leaver;
   const ZLocker<ZConditionLock> locker(&_lock);
   Atomic::store(&_nworking, _nworking - 1);
   if (_nworking == 0) {
