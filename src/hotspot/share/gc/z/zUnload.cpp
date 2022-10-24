@@ -147,7 +147,7 @@ void ZUnload::unlink() {
   bool unloading_occurred;
 
   {
-    MutexLocker ml(ClassLoaderDataGraph_lock);
+    const MutexLocker ml(ClassLoaderDataGraph_lock);
     unloading_occurred = SystemDictionary::do_unloading(ZGeneration::old()->gc_timer());
   }
 

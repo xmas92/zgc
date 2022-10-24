@@ -205,7 +205,7 @@ void ZNMethodTable::wait_until_iteration_done() {
 }
 
 void ZNMethodTable::unregister_nmethod(nmethod* nm) {
-  MutexLocker mu(CodeCache_lock, Mutex::_no_safepoint_check_flag);
+  const MutexLocker mu(CodeCache_lock, Mutex::_no_safepoint_check_flag);
 
   // Remove entry
   unregister_entry(_table, _size, nm);
@@ -214,7 +214,7 @@ void ZNMethodTable::unregister_nmethod(nmethod* nm) {
 }
 
 void ZNMethodTable::nmethods_do_begin(bool secondary) {
-  MutexLocker mu(CodeCache_lock, Mutex::_no_safepoint_check_flag);
+  const MutexLocker mu(CodeCache_lock, Mutex::_no_safepoint_check_flag);
 
   // Do not allow the table to be deleted while iterating
   _safe_delete.enable_deferred_delete();
@@ -224,7 +224,7 @@ void ZNMethodTable::nmethods_do_begin(bool secondary) {
 }
 
 void ZNMethodTable::nmethods_do_end(bool secondary) {
-  MutexLocker mu(CodeCache_lock, Mutex::_no_safepoint_check_flag);
+  const MutexLocker mu(CodeCache_lock, Mutex::_no_safepoint_check_flag);
 
   // Finish iteration
   iteration(secondary)->nmethods_do_end();
