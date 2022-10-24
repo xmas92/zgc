@@ -142,7 +142,7 @@ void ZUnload::unlink() {
     return;
   }
 
-  ZStatTimerOld timer(ZSubPhaseConcurrentClassesUnlink);
+  const ZStatTimerOld timer(ZSubPhaseConcurrentClassesUnlink);
   SuspendibleThreadSetJoiner sts;
   bool unloading_occurred;
 
@@ -161,7 +161,7 @@ void ZUnload::purge() {
     return;
   }
 
-  ZStatTimerOld timer(ZSubPhaseConcurrentClassesPurge);
+  const ZStatTimerOld timer(ZSubPhaseConcurrentClassesPurge);
 
   {
     SuspendibleThreadSetJoiner sts;

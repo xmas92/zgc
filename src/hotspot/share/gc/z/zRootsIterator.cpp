@@ -101,22 +101,22 @@ void ZParallelApply<Iterator>::apply(ClosureType* cl) {
 }
 
 void ZOopStorageSetIteratorStrong::apply(OopClosure* cl) {
-  ZRootStatTimer timer(ZSubPhaseConcurrentWeakRootsOopStorageSet, _generation);
+  const ZRootStatTimer timer(ZSubPhaseConcurrentWeakRootsOopStorageSet, _generation);
   _iter.oops_do(cl);
 }
 
 void ZCLDsIteratorStrong::apply(CLDClosure* cl) {
-  ZRootStatTimer timer(ZSubPhaseConcurrentRootsClassLoaderDataGraph, _generation);
+  const ZRootStatTimer timer(ZSubPhaseConcurrentRootsClassLoaderDataGraph, _generation);
   ClassLoaderDataGraph::always_strong_cld_do(cl);
 }
 
 void ZCLDsIteratorWeak::apply(CLDClosure* cl) {
-  ZRootStatTimer timer(ZSubPhaseConcurrentRootsClassLoaderDataGraph, _generation);
+  const ZRootStatTimer timer(ZSubPhaseConcurrentRootsClassLoaderDataGraph, _generation);
   ClassLoaderDataGraph::roots_cld_do(NULL /* strong */, cl /* weak */);
 }
 
 void ZCLDsIteratorAll::apply(CLDClosure* cl) {
-  ZRootStatTimer timer(ZSubPhaseConcurrentRootsClassLoaderDataGraph, _generation);
+  const ZRootStatTimer timer(ZSubPhaseConcurrentRootsClassLoaderDataGraph, _generation);
   ClassLoaderDataGraph::cld_do(cl);
 }
 
@@ -125,7 +125,7 @@ uint ZJavaThreadsIterator::claim() {
 }
 
 void ZJavaThreadsIterator::apply(ThreadClosure* cl) {
-  ZRootStatTimer timer(ZSubPhaseConcurrentRootsJavaThreads, _generation);
+  const ZRootStatTimer timer(ZSubPhaseConcurrentRootsJavaThreads, _generation);
 
   // The resource mark is needed because interpreter oop maps are
   // not reused in concurrent mode. Instead, they are temporary and
@@ -153,7 +153,7 @@ ZNMethodsIteratorImpl::~ZNMethodsIteratorImpl() {
 }
 
 void ZNMethodsIteratorImpl::apply(NMethodClosure* cl) {
-  ZRootStatTimer timer(ZSubPhaseConcurrentRootsCodeCache, _generation);
+  const ZRootStatTimer timer(ZSubPhaseConcurrentRootsCodeCache, _generation);
   ZNMethod::nmethods_do(_secondary, cl);
 }
 
@@ -176,7 +176,7 @@ void ZRootsIteratorWeakUncolored::apply(NMethodClosure* nm_cl) {
 }
 
 void ZOopStorageSetIteratorWeak::apply(OopClosure* cl) {
-  ZRootStatTimer timer(ZSubPhaseConcurrentWeakRootsOopStorageSet, _generation);
+  const ZRootStatTimer timer(ZSubPhaseConcurrentWeakRootsOopStorageSet, _generation);
   _iter.oops_do(cl);
 }
 

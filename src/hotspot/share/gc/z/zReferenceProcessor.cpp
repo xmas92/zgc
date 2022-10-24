@@ -434,7 +434,7 @@ public:
 };
 
 void ZReferenceProcessor::process_references() {
-  ZStatTimerOld timer(ZSubPhaseConcurrentReferencesProcess);
+  const ZStatTimerOld timer(ZSubPhaseConcurrentReferencesProcess);
 
   // Process discovered lists
   ZReferenceProcessorTask task(this);
@@ -477,7 +477,7 @@ zaddress ZReferenceProcessor::swap_pending_list(zaddress pending_list) {
 }
 
 void ZReferenceProcessor::enqueue_references() {
-  ZStatTimerOld timer(ZSubPhaseConcurrentReferencesEnqueue);
+  const ZStatTimerOld timer(ZSubPhaseConcurrentReferencesEnqueue);
 
   if (is_null(_pending_list.get())) {
     // Nothing to enqueue

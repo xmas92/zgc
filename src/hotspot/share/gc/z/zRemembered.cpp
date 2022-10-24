@@ -372,12 +372,12 @@ public:
 
 void ZRemembered::scan() const {
   if (ZGeneration::old()->is_phase_relocate()) {
-    ZStatTimerYoung timer(ZSubPhaseConcurrentMarkRootRemsetForwardingYoung);
+    const ZStatTimerYoung timer(ZSubPhaseConcurrentMarkRootRemsetForwardingYoung);
     ZRememberedScanForwardingTask task(*this);
     ZGeneration::young()->workers()->run(&task);
   }
 
-  ZStatTimerYoung timer(ZSubPhaseConcurrentMarkRootRemsetPageYoung);
+  const ZStatTimerYoung timer(ZSubPhaseConcurrentMarkRootRemsetPageYoung);
   ZRememberedScanPageTask task(*this);
   ZGeneration::young()->workers()->run(&task);
 }

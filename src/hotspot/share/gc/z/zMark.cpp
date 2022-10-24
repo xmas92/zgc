@@ -781,13 +781,13 @@ public:
 
   virtual void work() {
     {
-      ZStatTimerWorker timer(ZSubPhaseConcurrentMarkRootColoredOld);
+      const ZStatTimerWorker timer(ZSubPhaseConcurrentMarkRootColoredOld);
       _roots_colored.apply(&_cl_colored,
                            &_cld_cl);
     }
 
     {
-      ZStatTimerWorker timer(ZSubPhaseConcurrentMarkRootUncoloredOld);
+      const ZStatTimerWorker timer(ZSubPhaseConcurrentMarkRootUncoloredOld);
       _roots_uncolored.apply(&_thread_cl,
                              &_nm_cl);
     }
@@ -833,13 +833,13 @@ public:
 
   virtual void work() {
     {
-      ZStatTimerWorker timer(ZSubPhaseConcurrentMarkRootColoredYoung);
+      const ZStatTimerWorker timer(ZSubPhaseConcurrentMarkRootColoredYoung);
       _roots_colored.apply(&_cl_colored,
                            &_cld_cl);
     }
 
     {
-      ZStatTimerWorker timer(ZSubPhaseConcurrentMarkRootUncoloredYoung);
+      const ZStatTimerWorker timer(ZSubPhaseConcurrentMarkRootUncoloredYoung);
       _roots_uncolored.apply(&_thread_cl,
                              &_nm_cl);
     }

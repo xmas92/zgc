@@ -144,7 +144,7 @@ void ZRelocateQueue::leave() {
 }
 
 void ZRelocateQueue::add_and_wait(ZForwarding* forwarding) {
-  ZStatTimer timer(ZCriticalPhaseRelocationStall);
+  const ZStatTimer timer(ZCriticalPhaseRelocationStall);
   const ZLocker<ZConditionLock> locker(&_lock);
 
   if (forwarding->is_done()) {
