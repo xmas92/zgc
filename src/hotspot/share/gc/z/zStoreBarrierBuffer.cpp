@@ -306,7 +306,7 @@ void ZStoreBarrierBuffer::flush() {
   }
 
   OnError on_error(this);
-  VMErrorCallbackMark mark(&on_error);
+  const VMErrorCallbackMark mark(&on_error);
 
   for (int i = current(); i < (int)_buffer_length; ++i) {
     const ZStoreBarrierEntry& entry = _buffer[i];
