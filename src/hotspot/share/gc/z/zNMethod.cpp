@@ -110,7 +110,7 @@ void ZNMethod::log_register(const nmethod* nm) {
     return;
   }
 
-  ResourceMark rm;
+  const ResourceMark rm;
 
   const ZNMethodData* const data = gc_data(nm);
 
@@ -164,7 +164,7 @@ void ZNMethod::log_unregister(const nmethod* nm) {
     return;
   }
 
-  ResourceMark rm;
+  const ResourceMark rm;
 
   log.print("Unregister NMethod: %s.%s (" PTR_FORMAT ") [" PTR_FORMAT ", " PTR_FORMAT "] ",
             nm->method()->method_holder()->external_name(),
@@ -180,7 +180,7 @@ void ZNMethod::log_purge(const nmethod* nm) {
     return;
   }
 
-  ResourceMark rm;
+  const ResourceMark rm;
 
   log.print("Purge NMethod: %s.%s (" PTR_FORMAT ") [" PTR_FORMAT ", " PTR_FORMAT "] ",
             nm->method()->method_holder()->external_name(),

@@ -213,7 +213,7 @@ void ZHeap::threads_do(ThreadClosure* tc) const {
 }
 
 void ZHeap::out_of_memory() {
-  ResourceMark rm;
+  const ResourceMark rm;
 
   ZStatInc(ZCounterOutOfMemory);
   log_info(gc)("Out Of Memory (%s)", Thread::current()->name());

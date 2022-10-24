@@ -130,7 +130,7 @@ void ZJavaThreadsIterator::apply(ThreadClosure* cl) {
   // The resource mark is needed because interpreter oop maps are
   // not reused in concurrent mode. Instead, they are temporary and
   // resource allocated.
-  ResourceMark rm;
+  const ResourceMark rm;
 
   for (uint i = claim(); i < _threads.length(); i = claim()) {
     cl->do_thread(_threads.thread_at(i));

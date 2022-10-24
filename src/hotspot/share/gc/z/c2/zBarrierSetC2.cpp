@@ -678,7 +678,7 @@ void ZBarrierSetC2::analyze_dominating_barriers_impl(Node_List& accesses, Node_L
         }
       } else if (mem_block->dominates(access_block)) {
         // Dominating block? Look around for safepoints
-        ResourceMark rm;
+        const ResourceMark rm;
         Block_List stack;
         VectorSet visited;
         stack.push(access_block);
@@ -712,7 +712,7 @@ void ZBarrierSetC2::analyze_dominating_barriers_impl(Node_List& accesses, Node_L
 }
 
 void ZBarrierSetC2::analyze_dominating_barriers() const {
-  ResourceMark rm;
+  const ResourceMark rm;
   Compile* const C = Compile::current();
   PhaseCFG* const cfg = C->cfg();
 
@@ -788,7 +788,7 @@ void ZBarrierSetC2::analyze_dominating_barriers() const {
 // == Reduced spilling optimization ==
 
 void ZBarrierSetC2::compute_liveness_at_stubs() const {
-  ResourceMark rm;
+  const ResourceMark rm;
   Compile* const C = Compile::current();
   Arena* const A = Thread::current()->resource_area();
   PhaseCFG* const cfg = C->cfg();

@@ -267,7 +267,7 @@ void ZStoreBarrierBuffer::on_error(outputStream* st) {
   st->print_cr(" _last_processed_color: " PTR_FORMAT, _last_processed_color);
   st->print_cr(" _last_installed_color: " PTR_FORMAT, _last_installed_color);
 
-  ResourceMark rm;
+  const ResourceMark rm;
   stringStream ss;
 
   auto description = [&](void* pc) -> const char* {

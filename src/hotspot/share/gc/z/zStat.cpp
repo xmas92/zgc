@@ -602,7 +602,7 @@ void ZStatPhase::log_start(LogTargetHandle log, bool thread) const {
   }
 
   if (thread) {
-    ResourceMark rm;
+    const ResourceMark rm;
     log.print("%s (%s)", name(), Thread::current()->name());
   } else {
     log.print("%s", name());
@@ -615,7 +615,7 @@ void ZStatPhase::log_end(LogTargetHandle log, const Tickspan& duration, bool thr
   }
 
   if (thread) {
-    ResourceMark rm;
+    const ResourceMark rm;
     log.print("%s (%s) %.3fms", name(), Thread::current()->name(), TimeHelper::counter_to_millis(duration.value()));
   } else {
     log.print("%s %.3fms", name(), TimeHelper::counter_to_millis(duration.value()));
