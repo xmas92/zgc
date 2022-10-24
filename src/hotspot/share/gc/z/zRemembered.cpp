@@ -264,7 +264,7 @@ void ZRemembered::scan_forwarding(ZForwarding* forwarding, void* context_void) c
   ZRememberedScanForwardingContext* const context = (ZRememberedScanForwardingContext*)context_void;
 
   if (forwarding->retain_page(ZGeneration::old()->relocate_queue())) {
-    ZRememberedScanForwardingMeasureRetained measure(context);
+    const ZRememberedScanForwardingMeasureRetained measure(context);
     forwarding->page()->log_msg(" (scan_forwarding)");
 
     // We don't want to wait for the old relocation to finish and publish all
@@ -285,7 +285,7 @@ void ZRemembered::scan_forwarding(ZForwarding* forwarding, void* context_void) c
     });
 
   } else {
-    ZRememberedScanForwardingMeasureReleased measure(context);
+    const ZRememberedScanForwardingMeasureReleased measure(context);
 
     // The page has been released. If the page was relocated while this young
     // generation collection was running, the old generation relocation will
