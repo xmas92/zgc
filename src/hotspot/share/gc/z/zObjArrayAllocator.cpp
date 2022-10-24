@@ -33,7 +33,7 @@ ZObjArrayAllocator::ZObjArrayAllocator(Klass* klass, size_t word_size, int lengt
     ObjArrayAllocator(klass, word_size, length, do_zero, thread) {}
 
 void ZObjArrayAllocator::yield_for_safepoint() const {
-  ThreadBlockInVM tbivm(JavaThread::cast(_thread));
+  const ThreadBlockInVM tbivm(JavaThread::cast(_thread));
 }
 
 oop ZObjArrayAllocator::initialize(HeapWord* mem) const {

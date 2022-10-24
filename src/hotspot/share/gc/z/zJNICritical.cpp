@@ -110,7 +110,7 @@ void ZJNICritical::enter_inner(JavaThread* thread) {
       const ZStatTimer timer(ZCriticalPhaseJNICriticalStall);
 
       // Transition thread to blocked before locking to avoid deadlock
-      ThreadBlockInVM tbivm(thread);
+      const ThreadBlockInVM tbivm(thread);
 
       const ZLocker<ZConditionLock> locker(_lock);
       while (Atomic::load_acquire(&_count) < 0) {
