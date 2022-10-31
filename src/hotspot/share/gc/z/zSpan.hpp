@@ -35,6 +35,55 @@
 
 constexpr size_t dynamic_extent = -1;
 
+namespace details {
+  template <size_t ExtentValue>
+  class ExtentHolder {
+  public:
+    using size_type = size_t;
+
+    constexpr ExtentHolder() = default;
+
+    constexpr explicit ExtentHolder(ExtentHolder<dynamic_extent> extent);
+
+    constexpr explicit ExtentHolder(size_type size) {
+      precond(size == ExtentValue);
+    }
+
+    constexpr size_type size() const {
+      return ExtentValue;
+    }
+
+  private:
+    static constexpr size_type _size = ExtentValue;
+  };
+
+  template <>
+  class ExtentHolder<dynamic_extent> {
+  public:
+    using size_type = size_t;
+
+    template <size_type Other>
+    constexpr explicit ExtentHolder(ExtentHolder<Other> extent)
+      : _size(extent.size()) {}
+
+    constexpr explicit ExtentHolder(size_type size) : _size(size) {
+      precond(size != dynamic_extent);
+    }
+
+    constexpr size_type size() const {
+      return _size;
+    }
+
+  private:
+    size_type _size;
+  };
+
+  template<size_t ExtentValue>
+  constexpr ExtentHolder<ExtentValue>::ExtentHolder(ExtentHolder<dynamic_extent> extent) {
+    precond(extent.size() == ExtentValue);
+  }
+} // namespace details
+
 template<typename T, size_t Extent = dynamic_extent>
 class ZSpan {
 public:
@@ -54,7 +103,7 @@ public:
   static constexpr size_t extent = Extent;
 
   template<size_t ExtentValue = extent, ENABLE_IF(ExtentValue == 0 || ExtentValue == dynamic_extent)>
-  constexpr ZSpan() : _data_holder(nullptr, ExtentHolder<0>()) {}
+  constexpr ZSpan() : _data_holder(nullptr, details::ExtentHolder<0>()) {}
 
   /* No general iterator support yet
   template< class It >
@@ -88,7 +137,7 @@ public:
 
   template<size_t N>
   constexpr ZSpan(element_type (&arr)[N])
-    : _data_holder(arr, ExtentHolder<N>()) {}
+    : _data_holder(arr, details::ExtentHolder<N>()) {}
 
   /* No std::array equivelent yet
   template< class U, std::size_t N >
@@ -106,11 +155,11 @@ public:
 
   template<typename U, size_t N, ENABLE_IF(extent != dynamic_extent && N == dynamic_extent)>
   explicit constexpr ZSpan(const ZSpan<U, N>& source)
-    : _data_holder(source.data(), ExtentHolder<N>(source.size())) {}
+    : _data_holder(source.data(), details::ExtentHolder<N>(source.size())) {}
 
   template<typename U, size_t N, ENABLE_IF(extent == dynamic_extent || N != dynamic_extent)>
   constexpr ZSpan(const ZSpan<U, N>& source)
-    : _data_holder(source.data(), ExtentHolder<N>(source.size())) {}
+    : _data_holder(source.data(), details::ExtentHolder<N>(source.size())) {}
 
   constexpr ZSpan(const ZSpan& other) = default;
   constexpr ZSpan& operator=(const ZSpan& other) = default;
@@ -185,50 +234,6 @@ public:
   }
 
 private:
-  template <size_t ExtentValue>
-  class ExtentHolder {
-  public:
-    using size_type = size_t;
-
-    constexpr ExtentHolder() = default;
-
-    constexpr explicit ExtentHolder(ExtentHolder<dynamic_extent> extent) {
-      precond(extent.size() == ExtentValue);
-    }
-
-    constexpr explicit ExtentHolder(size_type size) {
-      precond(size == ExtentValue);
-    }
-
-    constexpr size_type size() const {
-      return ExtentValue;
-    }
-
-  private:
-    static constexpr size_type _size = ExtentValue;
-  };
-
-  template <>
-  class ExtentHolder<dynamic_extent> {
-  public:
-    using size_type = size_t;
-
-    template <size_type Other>
-    constexpr explicit ExtentHolder(ExtentHolder<Other> extent)
-      : _size(extent.size()) {}
-
-    constexpr explicit ExtentHolder(size_type size) : _size(size) {
-      precond(size != dynamic_extent);
-    }
-
-    constexpr size_type size() const {
-      return _size;
-    }
-
-  private:
-    size_type _size;
-  };
-
   template<size_type Offset, size_type Count>
   struct SelectSubSpanType {
     static constexpr size_type extent = Count != dynamic_extent
@@ -253,7 +258,7 @@ private:
     pointer _data;
   };
 
-  DataHolder<ExtentHolder<Extent>> _data_holder;
+  DataHolder<details::ExtentHolder<Extent>> _data_holder;
 
 public:
   // TODO(Axel): add static assertion when extent is known
