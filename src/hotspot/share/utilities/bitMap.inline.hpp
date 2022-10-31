@@ -514,4 +514,16 @@ inline bool BitMapReverseIterator::next(size_t* index) {
   return true;
 }
 
+inline void BitMap::par_set_word(idx_t idx, bm_word_t word) {
+  volatile bm_word_t* pw = word_addr(idx);
+  bm_word_t w = Atomic::load(pw);
+  bm_word_t nw = w | word;
+  while (true) {
+    bm_word_t res = Atomic::cmpxchg(pw, w, nw);
+    if (res == w) break;
+    w  = res;
+    nw = w | word;
+  }
+}
+
 #endif // SHARE_UTILITIES_BITMAP_INLINE_HPP

@@ -52,6 +52,14 @@ inline BitMap::idx_t ZRememberedSet::to_index(uintptr_t offset) {
   return offset / oopSize;
 }
 
+inline BitMap::idx_t ZRememberedSet::to_word_align_down(BitMap::idx_t bit_index) {
+  return BitMap::raw_to_words_align_down(bit_index);
+}
+
+inline BitMap::bm_word_t ZRememberedSet::to_bit_mask(BitMap::idx_t bit_index) {
+  return BitMap::bit_mask(bit_index);
+}
+
 inline BitMap::idx_t ZRememberedSet::to_bit_size(size_t size) {
   return size / oopSize;
 }

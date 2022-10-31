@@ -32,6 +32,9 @@
 #include "gc/z/zPhysicalMemory.hpp"
 #include "gc/z/zRememberedSet.hpp"
 #include "gc/z/zVirtualMemory.hpp"
+#include "gc/z/zSpan.hpp"
+#include "metaprogramming/isSame.hpp"
+#include "metaprogramming/enableIf.hpp"
 #include "memory/allocation.hpp"
 
 class ZGeneration;
@@ -167,6 +170,8 @@ public:
   void object_iterate(Function function);
 
   void remember(volatile zpointer* p);
+  template<typename T, ENABLE_IF(IsSame< decltype(T{}.p()), volatile zpointer* const&>::value)>
+  inline void remember_batch(ZSpan<T> span);
 
   // In-place relocation support
   void clear_remset_bit_non_par_current(uintptr_t l_offset);

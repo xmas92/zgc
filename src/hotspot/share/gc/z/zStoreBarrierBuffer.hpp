@@ -36,6 +36,7 @@ struct ZStoreBarrierEntry {
   void*              _pc;
   volatile zpointer* _p_original;
 
+  volatile zpointer* const & p() const { return _p; };
   static ByteSize p_offset();
   static ByteSize prev_offset();
   static ByteSize pc_offset();

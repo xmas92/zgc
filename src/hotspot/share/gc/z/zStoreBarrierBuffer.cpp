@@ -32,6 +32,8 @@
 #include "runtime/threadSMR.hpp"
 #include "utilities/ostream.hpp"
 #include "utilities/vmError.hpp"
+#include "utilities/quickSort.hpp"
+
 
 ByteSize ZStoreBarrierEntry::p_offset() {
   return byte_offset_of(ZStoreBarrierEntry, _p);
@@ -308,10 +310,28 @@ void ZStoreBarrierBuffer::flush() {
   OnError on_error(this);
   VMErrorCallbackMark mark(&on_error);
 
-  for (int i = current(); i < (int)_buffer_length; ++i) {
-    const ZStoreBarrierEntry& entry = _buffer[i];
-    const zaddress addr = ZBarrier::make_load_good(entry._prev);
-    ZBarrier::mark_and_remember(entry._p, addr);
+  const auto comp = [](ZStoreBarrierEntry& a, ZStoreBarrierEntry& b) -> ptrdiff_t {
+    return a._p - b._p;
+  };
+  const ZSpan<ZStoreBarrierEntry, 32> buffer_span = _buffer;
+  const auto entires = buffer_span.subspan(current());
+
+  QuickSort::sort(entires.data(), entires.size(), comp, true);
+  size_t start = 0;
+  while (start < entires.size()) {
+    ZPage *const page = ZHeap::heap()->page(entires[start].p());
+    assert(page != nullptr,  "Page missing in page table");
+    size_t end = start;
+    do {
+      const zaddress addr = ZBarrier::make_load_good(entires[end]._prev);
+      if (!is_null(addr)) {
+        ZBarrier::mark<ZMark::DontResurrect, ZMark::AnyThread, ZMark::Follow, ZMark::Strong>(addr);
+      }
+    } while (++end < entires.size() && page->is_in(to_zaddress((uintptr_t)entires[end].p())));
+    if (page->is_old()) {
+      page->remember_batch(entires.subspan(start, end-start));
+    }
+    start = end;
   }
 
   clear();

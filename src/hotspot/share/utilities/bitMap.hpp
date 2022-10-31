@@ -47,6 +47,7 @@ class BitMapClosure;
 // the subclasses. BitMap doesn't allocate or delete backing storage.
 class BitMap {
   friend class BitMap2D;
+  friend class ZRememberedSet;
 
  public:
   typedef size_t idx_t;         // Type used for bit and word indices.
@@ -172,7 +173,9 @@ class BitMap {
   void  set_range_within_word      (idx_t beg, idx_t end);
   void  clear_range_within_word    (idx_t beg, idx_t end);
   void  par_put_range_within_word  (idx_t beg, idx_t end, bool value);
-
+public:
+  void  par_set_word  (idx_t idx, bm_word_t word);
+protected:
   // Ranges spanning entire words.
   void      set_range_of_words         (idx_t beg, idx_t end);
   void      clear_range_of_words       (idx_t beg, idx_t end);

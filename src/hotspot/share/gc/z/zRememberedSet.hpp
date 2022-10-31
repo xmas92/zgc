@@ -103,6 +103,9 @@ public:
   template <typename Function>
   void iterate_bitmap(Function function, CHeapBitMap* bitmap);
 
+  static BitMap::idx_t to_word_align_down(BitMap::idx_t bit_index);
+  static BitMap::bm_word_t to_bit_mask(BitMap::idx_t bit_index);
+
   static uintptr_t to_offset(BitMap::idx_t index);
   static BitMap::idx_t to_index(uintptr_t offset);
   static BitMap::idx_t to_bit_size(size_t size);

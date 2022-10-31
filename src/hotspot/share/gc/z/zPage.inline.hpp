@@ -358,6 +358,41 @@ inline void ZPage::remember(volatile zpointer* p) {
   _remembered_set.set_current(l_offset);
 }
 
+template<typename T, ENABLE_IF_SDEFN(IsSame< decltype(T{}.p()), volatile zpointer* const&>::value)>
+inline void ZPage::remember_batch(ZSpan<T> entires) {
+  assert([&]() -> bool {
+    for (size_t i = 0; i + 1 < entires.size(); ++i) {
+      if (entires[i].p() > entires[i + 1].p()) {
+        return false;
+      }
+    }
+    return true;
+  }(), "must be sorted");
+  auto const get_index = [&](volatile zpointer* const& p) -> BitMap::idx_t {
+    const zaddress addr = to_zaddress((uintptr_t) p);
+    assert(is_in(addr), "must be in");
+    const uintptr_t l_offset = local_offset(addr);
+    return ZRememberedSet::to_index(l_offset);
+  };
+
+  for (size_t start = 0; start < entires.size(); ) {
+    const BitMap::idx_t low_idx = get_index(entires[start].p());
+    const BitMap::idx_t word_idx = ZRememberedSet::to_word_align_down(low_idx);
+    BitMap::bm_word_t word_acc = ZRememberedSet::to_bit_mask(low_idx);
+    size_t end = start;
+    while (++end < entires.size()) {
+      const BitMap::idx_t bit_idx = get_index(entires[end].p());
+      if (word_idx != ZRememberedSet::to_word_align_down(bit_idx)) {
+        break;
+      }
+      word_acc |= ZRememberedSet::to_bit_mask(bit_idx);
+    }
+    _remembered_set.current()->par_set_word(low_idx, word_acc);
+    start = end;
+  }
+
+}
+
 inline void ZPage::clear_remset_bit_non_par_current(uintptr_t l_offset) {
   _remembered_set.unset_non_par_current(l_offset);
 }
