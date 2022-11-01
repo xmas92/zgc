@@ -103,7 +103,7 @@ public:
 
   static constexpr size_t extent = Extent;
 
-  template<size_t ExtentValue = extent, ENABLE_IF(ExtentValue == 0 || ExtentValue == dynamic_extent)>
+  template<size_t ExtentValue = Extent, ENABLE_IF(ExtentValue == 0 || ExtentValue == dynamic_extent)>
   constexpr ZSpan() : _data_holder(nullptr, details::ExtentHolder<0>()) {}
 
   /* No general iterator support yet
@@ -111,13 +111,13 @@ public:
   explicit(extent != dynamic_extent)
   constexpr ZSpan( It first, size_type count );
   */
-  template<size_t ExtentValue = extent, ENABLE_IF(ExtentValue != dynamic_extent)>
+  template<size_t ExtentValue = Extent, ENABLE_IF(ExtentValue != dynamic_extent)>
   constexpr explicit ZSpan(pointer first, size_type count)
     : _data_holder(first, count) {
     precond(count == extent);
   };
 
-  template<size_t ExtentValue = extent, ENABLE_IF(ExtentValue == dynamic_extent)>
+  template<size_t ExtentValue = Extent, ENABLE_IF(ExtentValue == dynamic_extent)>
   constexpr ZSpan(pointer first, size_type count)
     : _data_holder(first, count) {};
 
@@ -126,13 +126,13 @@ public:
   explicit(extent != std::dynamic_extent)
   constexpr ZSpan( It first, End last );
   */
-  template<size_t ExtentValue = extent, ENABLE_IF(ExtentValue != dynamic_extent)>
+  template<size_t ExtentValue = Extent, ENABLE_IF(ExtentValue != dynamic_extent)>
   constexpr ZSpan(pointer first, pointer last)
     : _data_holder(first, PrimitiveConversions::cast<size_type>(last - first)) {
     precond(last - first == PrimitiveConversions::cast<difference_type>(extent));
   };
 
-  template<size_t ExtentValue = extent, ENABLE_IF(ExtentValue == dynamic_extent)>
+  template<size_t ExtentValue = Extent, ENABLE_IF(ExtentValue == dynamic_extent)>
   constexpr explicit ZSpan(pointer first, pointer last)
     : _data_holder(first, PrimitiveConversions::cast<size_type>(last - first)) {};
 
@@ -154,11 +154,11 @@ public:
   constexpr ZSpan(R&& range);
   */
 
-  template<typename U, size_t N, ENABLE_IF(extent != dynamic_extent && N == dynamic_extent)>
+  template<typename U, size_t N, size_t _Extent = Extent, ENABLE_IF(_Extent != dynamic_extent && N == dynamic_extent)>
   explicit constexpr ZSpan(const ZSpan<U, N>& source)
     : _data_holder(source.data(), details::ExtentHolder<N>(source.size())) {}
 
-  template<typename U, size_t N, ENABLE_IF(extent == dynamic_extent || N != dynamic_extent)>
+  template<typename U, size_t N, size_t _Extent = Extent, ENABLE_IF(_Extent == dynamic_extent || N != dynamic_extent)>
   constexpr ZSpan(const ZSpan<U, N>& source)
     : _data_holder(source.data(), details::ExtentHolder<N>(source.size())) {}
 
