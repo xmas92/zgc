@@ -114,7 +114,7 @@ TEST(ZCArray, construction) {
   using T = int;
   constexpr size_t size = 10;
 
-  const auto check = [](auto& a) {
+  const auto check = [&](auto& a) {
     EXPECT_TRUE(a.size() == size);
     EXPECT_TRUE(a.max_size() == size);
     EXPECT_TRUE(!a.empty());
@@ -137,7 +137,7 @@ TEST(ZCArray, construction) {
     const ZCArray<T, size> ca = {a};
     check(ca);
   }
-  const auto check_with_first = [](auto& a, T&& first_value) {
+  const auto check_with_first = [&](auto& a, T&& first_value) {
     EXPECT_TRUE(a.size() == size);
     EXPECT_TRUE(a.max_size() == size);
     EXPECT_TRUE(!a.empty());
@@ -198,7 +198,7 @@ TEST(ZCArray, fill) {
   using T = int;
   constexpr size_t size = 10;
 
-  const auto check = [](auto& a, T&& check_value) {
+  const auto check = [&](auto& a, T&& check_value) {
     EXPECT_TRUE(a.size() == size);
     EXPECT_TRUE(a.max_size() == size);
     EXPECT_TRUE(!a.empty());
