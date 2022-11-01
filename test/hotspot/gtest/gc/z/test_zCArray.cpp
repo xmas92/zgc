@@ -162,6 +162,7 @@ TEST(ZCArray, construction) {
   }
 }
 
+#ifdef ASSERT
 TEST_VM_ASSERT(ZCArray, overflow_operator_at) {
   using T = int;
   constexpr size_t size = 1;
@@ -175,6 +176,7 @@ TEST_VM_ASSERT(ZCArray, overflow_const_operator_at) {
   const ZCArray<T, size> a{};
   static_cast<void>(a[size]);
 }
+#endif
 
 constexpr auto guarantee = "guarantee";
 
