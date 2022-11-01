@@ -102,6 +102,7 @@ TEST(ZSpan, constructor_2) {
     EXPECT_TRUE(s.data() == data);
   }
 }
+#ifdef ASSERT
 TEST_VM_ASSERT(ZSpan, constructor_2_wrong_count) {
   using T = int;
   constexpr size_t count = 2;
@@ -118,6 +119,7 @@ TEST_VM_ASSERT(ZSpan, constructor_2_nullptr_dynamic) {
   constexpr size_t count = 2;
   const ZSpan<T> s{nullptr, count};
 }
+#endif
 
 TEST(ZSpan, constructor_3) {
   using T = int;
@@ -184,12 +186,14 @@ TEST(ZSpan, constructor_3) {
     }
   }
 }
+#ifdef ASSERT
 TEST_VM_ASSERT(ZSpan, constructor_3_wrong_count) {
   using T = int;
   constexpr size_t count = 2;
   T data[count] = {0};
   const ZSpan<T, 1> s{data, data + count};
 }
+#endif
 
 TEST(ZSpan, constructor_4) {
   using T = int;
@@ -292,6 +296,7 @@ TEST(ZSpan, constructor_8) {
   EXPECT_TRUE(s.size() == count);
   EXPECT_TRUE(s.data() == data);
 }
+#ifdef ASSERT
 TEST_VM_ASSERT(ZSpan, constructor_8_wrong_count) {
   using T = int;
   constexpr size_t count = 2;
@@ -300,6 +305,7 @@ TEST_VM_ASSERT(ZSpan, constructor_8_wrong_count) {
 
   const ZSpan<T, 1> s{span};
 }
+#endif
 
 TEST(ZSpan, constructor_9) {
   using T = int;
@@ -356,11 +362,13 @@ TEST(ZSpan, front) {
     EXPECT_TRUE(&s.front() == &data[0]);
   }
 }
+#ifdef ASSERT
 TEST_VM_ASSERT(ZSpan, front) {
   using T = int;
   const ZSpan<T> s;
   s.front();
 }
+#endif
 
 // https://en.cppreference.com/w/cpp/container/span/back
 
@@ -377,11 +385,13 @@ TEST(ZSpan, back) {
     EXPECT_TRUE(&s.back() == &data[count-1]);
   }
 }
+#ifdef ASSERT
 TEST_VM_ASSERT(ZSpan, back) {
   using T = int;
   const ZSpan<T> s;
   s.back();
 }
+#endif
 
 // https://en.cppreference.com/w/cpp/container/span/operator_at
 
@@ -489,6 +499,7 @@ TEST(ZSpan, first) {
     }
   }
 }
+#ifdef ASSERT
 TEST_VM_ASSERT(ZSpan, first_overflow) {
   using T = int;
   constexpr size_t count = 2;
@@ -510,6 +521,7 @@ TEST_VM_ASSERT(ZSpan, first_overflow_dynamic2) {
   const ZSpan<T> s{data};
   s.first<count + 1>();
 }
+#endif
 
 // https://en.cppreference.com/w/cpp/container/span/last
 
@@ -582,6 +594,7 @@ TEST(ZSpan, last) {
     }
   }
 }
+#ifdef ASSERT
 TEST_VM_ASSERT(ZSpan, last_overflow) {
   using T = int;
   constexpr size_t count = 2;
@@ -603,6 +616,7 @@ TEST_VM_ASSERT(ZSpan, last_overflow_dynamic2) {
   const ZSpan<T> s{data};
   s.last<count + 1>();
 }
+#endif
 
 // https://en.cppreference.com/w/cpp/container/span/subspan
 
@@ -680,6 +694,7 @@ TEST(ZSpan, subspan) {
     EXPECT_TRUE(s.subspan(0).data() == nullptr);
   }
 }
+#ifdef ASSERT
 TEST_VM_ASSERT(ZSpan, subspan_offset_overflow) {
   using T = int;
   constexpr size_t count = 2;
@@ -722,6 +737,7 @@ TEST_VM_ASSERT(ZSpan, subspan_count_dynamic2) {
   const ZSpan<T> s{data};
   s.subspan<1, count>();
 }
+#endif
 
 // https://en.cppreference.com/w/cpp/container/span/as_bytes
 
