@@ -22,6 +22,7 @@
  */
 
 #include "precompiled.hpp"
+#include "gc/z/zCArray.hpp"
 #include "gc/z/zSpan.hpp"
 #include "metaprogramming/isSame.hpp"
 #include "unittest.hpp"
@@ -204,6 +205,80 @@ TEST(ZSpan, constructor_4) {
       const ZSpan<T, count> s{data};
       EXPECT_TRUE(s.size() == count);
       EXPECT_TRUE(s.data() == data);
+  }
+  {
+      const ZSpan<T> s = data;
+      EXPECT_TRUE(s.size() == count);
+      EXPECT_TRUE(s.data() == data);
+  }
+  {
+      const ZSpan<T, count> s = data;
+      EXPECT_TRUE(s.size() == count);
+      EXPECT_TRUE(s.data() == data);
+  }
+}
+
+TEST(ZSpan, constructor_5) {
+  using T = int;
+  constexpr size_t count = 2;
+  ZCArray<T, count> data = {0, 0};
+
+  {
+      const ZSpan<T> s{data};
+      EXPECT_TRUE(s.size() == count);
+      EXPECT_TRUE(s.data() == data.data());
+  }
+  {
+      const ZSpan<T, count> s{data};
+      EXPECT_TRUE(s.size() == count);
+      EXPECT_TRUE(s.data() == data.data());
+  }
+  {
+      const ZSpan<T> s = data;
+      EXPECT_TRUE(s.size() == count);
+      EXPECT_TRUE(s.data() == data.data());
+  }
+  {
+      const ZSpan<T, count> s = data;
+      EXPECT_TRUE(s.size() == count);
+      EXPECT_TRUE(s.data() == data.data());
+  }
+  {
+      const ZSpan<const T> s = data;
+      EXPECT_TRUE(s.size() == count);
+      EXPECT_TRUE(s.data() == data.data());
+  }
+  {
+      const ZSpan<const T, count> s = data;
+      EXPECT_TRUE(s.size() == count);
+      EXPECT_TRUE(s.data() == data.data());
+  }
+}
+
+TEST(ZSpan, constructor_6) {
+  using T = int;
+  constexpr size_t count = 2;
+  const ZCArray<T, count> data = {0, 0};
+
+  {
+      const ZSpan<const T> s{data};
+      EXPECT_TRUE(s.size() == count);
+      EXPECT_TRUE(s.data() == data.data());
+  }
+  {
+      const ZSpan<const T, count> s{data};
+      EXPECT_TRUE(s.size() == count);
+      EXPECT_TRUE(s.data() == data.data());
+  }
+  {
+      const ZSpan<const T> s = data;
+      EXPECT_TRUE(s.size() == count);
+      EXPECT_TRUE(s.data() == data.data());
+  }
+  {
+      const ZSpan<const T, count> s = data;
+      EXPECT_TRUE(s.size() == count);
+      EXPECT_TRUE(s.data() == data.data());
   }
 }
 

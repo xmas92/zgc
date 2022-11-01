@@ -25,6 +25,7 @@
 #define SHARE_GC_Z_ZSPAN_HPP
 
 #include "gc/z/zByte.hpp"
+#include "gc/z/zCArray.hpp"
 #include "metaprogramming/enableIf.hpp"
 #include "metaprogramming/isConst.hpp"
 #include "metaprogramming/primitiveConversions.hpp"
@@ -139,13 +140,13 @@ public:
   constexpr ZSpan(element_type (&arr)[N])
     : _data_holder(arr, details::ExtentHolder<N>()) {}
 
-  /* No std::array equivelent yet
-  template< class U, std::size_t N >
-  constexpr ZSpan( std::array<U, N>& arr )
+  template<class U, std::size_t N>
+  constexpr ZSpan(ZCArray<U, N>& arr)
+    : _data_holder(arr.data(), details::ExtentHolder<N>()) {}
 
-  template< class U, std::size_t N >
-  constexpr ZSpan( const std::array<U, N>& arr )
-  */
+  template<class U, std::size_t N>
+  constexpr ZSpan(const ZCArray<U, N>& arr)
+    : _data_holder(arr.data(), details::ExtentHolder<N>()) {}
 
   /* No Range / Container support
   template<class R>
