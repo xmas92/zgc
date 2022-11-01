@@ -172,6 +172,8 @@ public:
   void remember(volatile zpointer* p);
   template<typename T, ENABLE_IF(IsSame< decltype(T{}.p()), volatile zpointer* const&>::value)>
   inline void remember_batch(ZSpan<T> span);
+  template<typename T, ENABLE_IF(IsSame< decltype(T{}->p()), volatile zpointer* const&>::value)>
+  inline void remember_batch(ZSpan<T> span);
 
   // In-place relocation support
   void clear_remset_bit_non_par_current(uintptr_t l_offset);

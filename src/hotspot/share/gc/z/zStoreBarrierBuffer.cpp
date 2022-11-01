@@ -25,6 +25,7 @@
 #include "gc/shared/gc_globals.hpp"
 #include "gc/z/zAddress.inline.hpp"
 #include "gc/z/zBarrier.inline.hpp"
+#include "gc/z/zCArray.hpp"
 #include "gc/z/zGeneration.inline.hpp"
 #include "gc/z/zStoreBarrierBuffer.inline.hpp"
 #include "gc/z/zUncoloredRoot.inline.hpp"
@@ -310,24 +311,28 @@ void ZStoreBarrierBuffer::flush() {
   OnError on_error(this);
   VMErrorCallbackMark mark(&on_error);
 
-  const auto comp = [](ZStoreBarrierEntry& a, ZStoreBarrierEntry& b) -> ptrdiff_t {
-    return a._p - b._p;
+  const auto comp = [](ZStoreBarrierEntry* a, ZStoreBarrierEntry* b) -> ptrdiff_t {
+    return a->_p - b->_p;
   };
-  const ZSpan<ZStoreBarrierEntry, 32> buffer_span = _buffer;
+  ZCArray<ZStoreBarrierEntry*, 32> _buffer_ptrs;
+  for (size_t i = current(); i < 32; ++i) {
+    _buffer_ptrs[i] = &_buffer[i];
+  }
+  const ZSpan<ZStoreBarrierEntry*, 32> buffer_span = _buffer_ptrs;
   const auto entires = buffer_span.subspan(current());
 
   QuickSort::sort(entires.data(), entires.size(), comp, true);
   size_t start = 0;
   while (start < entires.size()) {
-    ZPage *const page = ZHeap::heap()->page(entires[start].p());
+    ZPage *const page = ZHeap::heap()->page(entires[start]->p());
     assert(page != nullptr,  "Page missing in page table");
     size_t end = start;
     do {
-      const zaddress addr = ZBarrier::make_load_good(entires[end]._prev);
+      const zaddress addr = ZBarrier::make_load_good(entires[end]->_prev);
       if (!is_null(addr)) {
         ZBarrier::mark<ZMark::DontResurrect, ZMark::AnyThread, ZMark::Follow, ZMark::Strong>(addr);
       }
-    } while (++end < entires.size() && page->is_in(to_zaddress((uintptr_t)entires[end].p())));
+    } while (++end < entires.size() && page->is_in(to_zaddress((uintptr_t)entires[end]->p())));
     if (page->is_old()) {
       page->remember_batch(entires.subspan(start, end-start));
     }
