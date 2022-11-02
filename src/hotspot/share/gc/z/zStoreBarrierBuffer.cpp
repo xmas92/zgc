@@ -321,7 +321,7 @@ void ZStoreBarrierBuffer::flush() {
   const ZSpan<ZStoreBarrierEntry*, 32> buffer_span = _buffer_ptrs;
   const auto entires = buffer_span.subspan(current());
 
-  QuickSort::sort(entires.data(), entires.size(), comp, true);
+  QuickSort::sort(entires.data(), entires.size(), comp, false);
   size_t start = 0;
   while (start < entires.size()) {
     ZPage *const page = ZHeap::heap()->page(entires[start]->p());
