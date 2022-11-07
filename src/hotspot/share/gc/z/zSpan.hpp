@@ -36,7 +36,7 @@
 
 constexpr size_t dynamic_extent = -1;
 
-namespace details {
+namespace {
   template <size_t ExtentValue>
   class ExtentHolder {
   public:
@@ -83,7 +83,7 @@ namespace details {
   constexpr ExtentHolder<ExtentValue>::ExtentHolder(ExtentHolder<dynamic_extent> extent) {
     precond(extent.size() == ExtentValue);
   }
-} // namespace details
+} // namespace
 
 template<typename T, size_t Extent = dynamic_extent>
 class ZSpan {
@@ -104,7 +104,7 @@ public:
   static constexpr size_t extent = Extent;
 
   template<size_t ExtentValue = Extent, ENABLE_IF(ExtentValue == 0 || ExtentValue == dynamic_extent)>
-  constexpr ZSpan() : _data_holder(nullptr, details::ExtentHolder<0>()) {}
+  constexpr ZSpan() : _data_holder(nullptr, ExtentHolder<0>()) {}
 
   /* No general iterator support yet
   template< class It >
@@ -138,15 +138,15 @@ public:
 
   template<size_t N>
   constexpr ZSpan(element_type (&arr)[N])
-    : _data_holder(arr, details::ExtentHolder<N>()) {}
+    : _data_holder(arr, ExtentHolder<N>()) {}
 
   template<class U, std::size_t N>
   constexpr ZSpan(ZCArray<U, N>& arr)
-    : _data_holder(arr.data(), details::ExtentHolder<N>()) {}
+    : _data_holder(arr.data(), ExtentHolder<N>()) {}
 
   template<class U, std::size_t N>
   constexpr ZSpan(const ZCArray<U, N>& arr)
-    : _data_holder(arr.data(), details::ExtentHolder<N>()) {}
+    : _data_holder(arr.data(), ExtentHolder<N>()) {}
 
   /* No Range / Container support
   template<class R>
@@ -156,11 +156,11 @@ public:
 
   template<typename U, size_t N, size_t _Extent = Extent, ENABLE_IF(_Extent != dynamic_extent && N == dynamic_extent)>
   explicit constexpr ZSpan(const ZSpan<U, N>& source)
-    : _data_holder(source.data(), details::ExtentHolder<N>(source.size())) {}
+    : _data_holder(source.data(), ExtentHolder<N>(source.size())) {}
 
   template<typename U, size_t N, size_t _Extent = Extent, ENABLE_IF(_Extent == dynamic_extent || N != dynamic_extent)>
   constexpr ZSpan(const ZSpan<U, N>& source)
-    : _data_holder(source.data(), details::ExtentHolder<N>(source.size())) {}
+    : _data_holder(source.data(), ExtentHolder<N>(source.size())) {}
 
   constexpr ZSpan(const ZSpan& other) = default;
   constexpr ZSpan& operator=(const ZSpan& other) = default;
@@ -259,7 +259,7 @@ private:
     pointer _data;
   };
 
-  DataHolder<details::ExtentHolder<Extent>> _data_holder;
+  DataHolder<ExtentHolder<Extent>> _data_holder;
 
 public:
   // TODO(Axel): add static assertion when extent is known
