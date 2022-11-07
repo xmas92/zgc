@@ -108,7 +108,8 @@ struct ZCArray {
   constexpr const_reverse_iterator crend() const;
   */
 
-  [[nodiscard]] constexpr bool empty() const {
+  // Add [[nodiscard]] C++17
+  constexpr bool empty() const {
     return false;
   }
 
@@ -218,7 +219,8 @@ struct ZCArray<T, 0> {
   constexpr const_reverse_iterator crend() const;
   */
 
-  [[nodiscard]] constexpr bool empty() const {
+  // Add [[nodiscard]] C++17
+  constexpr bool empty() const {
     return true;
   }
 
