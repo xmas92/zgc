@@ -26,8 +26,8 @@
 #include "gc/z/zSpan.hpp"
 #include "metaprogramming/isSame.hpp"
 #include "unittest.hpp"
-
-#ifndef PRODUCT
+#include "utilities/debug.hpp"
+#include "utilities/macros.hpp"
 
  // https://en.cppreference.com/w/cpp/container/span/span
 
@@ -831,6 +831,220 @@ TEST(ZSpan, sizeof) {
     const ZSpan<T, 0> s;
     EXPECT_TRUE(sizeof(s) == sizeof(ZSpan<T>::pointer));
   }
+  {
+    const ZSpan<T> s;
+    auto it = s.begin();
+    EXPECT_TRUE(sizeof(it) == DEBUG_ONLY(3 * ) sizeof(ZSpan<T>::pointer));
+  }
+  {
+    const ZSpan<T, 0> s;
+    auto it = s.begin();
+    EXPECT_TRUE(sizeof(it) == DEBUG_ONLY(3 * ) sizeof(ZSpan<T>::pointer));
+  }
 }
 
-#endif // PRODUCT
+template<typename Span, size_t Size>
+static void iterator_test() {
+  using T = typename Span::value_type;
+  constexpr size_t size = Size;
+  STATIC_ASSERT(Span::extent == dynamic_extent || Span::extent == Size);
+  STATIC_ASSERT(size % 2 == 0);
+  ZCArray<T, size> a{};
+  {
+    Span s = a;
+    T value{};
+    for (T& v : s) {
+      v = value++;
+    }
+  }
+  {
+    Span s = a;
+    T value{};
+    for (const T& v : s) {
+      EXPECT_TRUE(v == value++);
+    }
+  }
+  {
+    const Span s = a;
+    const auto cb = s.begin();
+    const auto ce = s.end();
+    T i{};
+    for (const T& v : a) {
+      EXPECT_TRUE(cb[i] == v);
+      EXPECT_TRUE(ce[-(size - i++)] == v);
+    }
+  }
+  {
+    Span s = a;
+    T value{};
+    for (auto it = s.begin(), end = s.end(); it != end; ++it) {
+      *it = 0;
+    }
+  }
+  {
+    const Span s = a;
+    for (auto it = s.begin(), end = s.end(); it != end; ++it) {
+      EXPECT_TRUE(*it == 0);
+    }
+  }
+  {
+    Span s = a;
+    auto b = s.begin(), e = s.end();
+    b += size / 2;
+    e -= size / 2;
+    EXPECT_TRUE(b == e);
+    b += size / 2;
+    e -= size / 2;
+    EXPECT_TRUE(s.begin() == e);
+    EXPECT_TRUE(b == s.end());
+  }
+  {
+    const Span s = a;
+    auto cb = s.begin(), ce = s.end();
+    cb += size / 2;
+    ce -= size / 2;
+    EXPECT_TRUE(cb == ce);
+    cb += size / 2;
+    ce -= size / 2;
+    EXPECT_TRUE(s.begin() == ce);
+    EXPECT_TRUE(cb == s.end());
+  }
+  {
+    const auto test = [&](auto b, auto e) {
+      EXPECT_TRUE(b < e);
+      EXPECT_TRUE(b <= e);
+      EXPECT_FALSE(b > e);
+      EXPECT_FALSE(b >= e);
+      EXPECT_TRUE(b != e);
+      EXPECT_FALSE(b == e);
+
+      EXPECT_TRUE((b + (size / 2)) == (e - (size / 2)));
+      EXPECT_TRUE((e - b) == size);
+      EXPECT_TRUE((b - e) == -static_cast<ptrdiff_t>(size));
+    };
+
+    Span s = a;
+    const Span cs = a;
+    test(s.begin(), s.end());
+    test(cs.begin(), cs.end());
+  }
+}
+
+TEST(ZSpan, iterator) {
+  using T = int;
+  constexpr size_t size = 10;
+  iterator_test<ZSpan<T>, size>();
+  iterator_test<ZSpan<T, size>, size>();
+  {
+    ZCArray<T, 0> za;
+    ZSpan<T> zsd = za;
+    ZSpan<T, 0> zs0 = za;
+    const auto test = [&](auto b, auto e) {
+      EXPECT_FALSE(b < e);
+      EXPECT_TRUE(b <= e);
+      EXPECT_FALSE(b > e);
+      EXPECT_TRUE(b >= e);
+      EXPECT_FALSE(b != e);
+      EXPECT_TRUE(b == e);
+
+      EXPECT_TRUE(b == e);
+      EXPECT_TRUE((e - b) == 0);
+      EXPECT_TRUE((b - e) == 0);
+    };
+
+    test(zsd.begin(), zsd.end());
+    test(zs0.begin(), zs0.end());
+  }
+}
+
+template<typename SpanOne, typename SpanTwo, size_t Size>
+static void test_different_iter() {
+  using T = typename SpanOne::value_type;
+  STATIC_ASSERT((IsSame<T, typename SpanTwo::value_type>::value));
+  constexpr size_t size = Size;
+  {
+    ZCArray<T, size> a{};
+    ZCArray<T, size> b{};
+    SpanOne as = a;
+    SpanTwo bs = b;
+    static_cast<void>(as.begin() < bs.begin());
+  }
+}
+
+#ifdef ASSERT
+TEST_VM_ASSERT(ZSpan, different_iter) {
+  using T = int;
+  constexpr size_t size = 10;
+  test_different_iter<ZSpan<T>, ZSpan<T>, size>();
+}
+TEST_VM_ASSERT(ZSpan, different_iter_fixed) {
+  using T = int;
+  constexpr size_t size = 10;
+  test_different_iter<ZSpan<T, size>, ZSpan<T, size>, size>();
+}
+TEST_VM_ASSERT(ZSpan, different_iter_mix) {
+  using T = int;
+  constexpr size_t size = 10;
+  test_different_iter<ZSpan<T>, ZSpan<T, size>, size>();
+}
+
+TEST_VM_ASSERT(ZSpan, underflow) {
+  using T = int;
+  constexpr size_t size = 10;
+  ZCArray<T, size> a{};
+  ZSpan<T> s = a;
+  static_cast<void>(--s.begin());
+}
+TEST_VM_ASSERT(ZSpan, underflow_fixed) {
+  using T = int;
+  constexpr size_t size = 10;
+  ZCArray<T, size> a{};
+  ZSpan<T, size> s = a;
+  static_cast<void>(--s.begin());
+}
+
+TEST_VM_ASSERT(ZSpan, overflow) {
+  using T = int;
+  constexpr size_t size = 10;
+  ZCArray<T, size> a{};
+  ZSpan<T> s = a;
+  static_cast<void>(++s.end());
+}
+TEST_VM_ASSERT(ZSpan, overflow_fixed) {
+  using T = int;
+  constexpr size_t size = 10;
+  ZCArray<T, size> a{};
+  ZSpan<T, size> s = a;
+  static_cast<void>(++s.end());
+}
+
+TEST_VM_ASSERT(ZSpan, underflow_at) {
+  using T = int;
+  constexpr size_t size = 10;
+  ZCArray<T, size> a{};
+  ZSpan<T> s = a;
+  static_cast<void>(s.begin()[-1]);
+}
+TEST_VM_ASSERT(ZSpan, underflow_at_fixed) {
+  using T = int;
+  constexpr size_t size = 10;
+  ZCArray<T, size> a{};
+  ZSpan<T, size> s = a;
+  static_cast<void>(s.begin()[-1]);
+}
+
+TEST_VM_ASSERT(ZSpan, overflow_at) {
+  using T = int;
+  constexpr size_t size = 10;
+  ZCArray<T, size> a{};
+  ZSpan<T> s = a;
+  static_cast<void>(*s.end());
+}
+TEST_VM_ASSERT(ZSpan, overflow_at_fixed) {
+  using T = int;
+  constexpr size_t size = 10;
+  ZCArray<T, size> a{};
+  ZSpan<T, size> s = a;
+  static_cast<void>(*s.end());
+}
+#endif // ASSERT

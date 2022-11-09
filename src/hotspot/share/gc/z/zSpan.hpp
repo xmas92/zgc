@@ -30,7 +30,9 @@
 #include "metaprogramming/isConst.hpp"
 #include "metaprogramming/primitiveConversions.hpp"
 #include "metaprogramming/removeCV.hpp"
+#include "utilities/debug.hpp"
 #include "utilities/globalDefinitions.hpp"
+#include "utilities/macros.hpp"
 
 // https://en.cppreference.com/w/cpp/container/span/span
 
@@ -83,6 +85,145 @@ namespace {
   constexpr ExtentHolder<ExtentValue>::ExtentHolder(ExtentHolder<dynamic_extent> extent) {
     precond(extent.size() == ExtentValue);
   }
+
+  template<typename T>
+  struct ZSpanIterator {
+    /* No concept support yet
+    using iterator_concept = std::contiguous_iterator_tag;
+    */
+    /* No stl support yet
+    using iterator_category = std::random_access_iterator_tag;
+    */
+    using value_type = typename RemoveCV<T>::type;
+    using difference_type = ptrdiff_t;
+    using pointer = T*;
+    using reference = T&;
+
+    // Add [[maybe_unused]] in C++17
+    template<typename _T = T>
+    static constexpr ZSpanIterator<_T> make_iterator(pointer ptr, pointer begin, pointer end) {
+#ifdef ASSERT
+      return {ptr, begin, end};
+#else
+      return {ptr};
+#endif
+    }
+
+    constexpr operator ZSpanIterator<const T>() {
+      return DEBUG_ONLY(make_iterator<const T>(_ptr, _begin, _end)) NOT_DEBUG(make_iterator<const T>(_ptr, _ptr, _ptr));
+    }
+
+    constexpr reference operator*() const {
+      precond(_ptr >= _begin);
+      precond(_ptr < _end);
+      return *_ptr;
+    }
+
+    constexpr pointer operator->() const {
+      precond(_ptr >= _begin);
+      precond(_ptr < _end);
+      return _ptr;
+    }
+
+    constexpr ZSpanIterator& operator++() {
+      precond(_ptr >= _begin);
+      precond(_ptr < _end);
+      ++_ptr;
+      return *this;
+    }
+
+    constexpr ZSpanIterator operator++(int) {
+      auto temp = *this;
+      operator++();
+      return temp;
+    }
+
+    constexpr ZSpanIterator& operator--() {
+      precond(_ptr > _begin);
+      precond(_ptr <= _end);
+      --_ptr;
+      return *this;
+    }
+
+    constexpr ZSpanIterator operator--(int) {
+      auto temp = *this;
+      operator--();
+      return temp;
+    }
+
+    constexpr ZSpanIterator& operator+=(const difference_type offset) {
+      precond(_ptr + offset >= _begin);
+      precond(_ptr + offset <= _end);
+      _ptr += offset;
+      return *this;
+    }
+
+    constexpr ZSpanIterator operator+(const difference_type offset) const {
+      auto temp = *this;
+      temp += offset;
+      return temp;
+    }
+
+    friend constexpr ZSpanIterator& operator+(const difference_type offset, ZSpanIterator& rhs) {
+      rhs += offset;
+      return rhs;
+    }
+
+    constexpr ZSpanIterator& operator-=(const difference_type offset) {
+      precond(_ptr - offset >= _begin);
+      precond(_ptr - offset <= _end);
+      _ptr -= offset;
+      return *this;
+    }
+
+    constexpr ZSpanIterator operator-(const difference_type offset) const {
+      auto temp = *this;
+      temp -= offset;
+      return temp;
+    }
+
+    constexpr difference_type operator-(const ZSpanIterator& rhs) const {
+      precond(_begin == rhs._begin && _end == rhs._end);
+      return _ptr - rhs._ptr;
+    }
+
+    constexpr reference operator[](const difference_type offset) const {
+      return *(operator+(offset));
+    }
+
+    constexpr bool operator==(const ZSpanIterator& rhs) const {
+      precond(_begin == rhs._begin && _end == rhs._end);
+      return _ptr == rhs._ptr;
+    }
+
+    constexpr bool operator!=(const ZSpanIterator& rhs) const {
+      return !(*this == rhs);
+    }
+
+    constexpr bool operator<(const ZSpanIterator& rhs) const {
+      precond(_begin == rhs._begin && _end == rhs._end);
+      return _ptr < rhs._ptr;
+    }
+
+    constexpr bool operator>(const ZSpanIterator& rhs) const {
+      precond(_begin == rhs._begin && _end == rhs._end);
+      return _ptr > rhs._ptr;
+    }
+
+    constexpr bool operator<=(const ZSpanIterator& rhs) const {
+      return !(*this > rhs);
+    }
+
+    constexpr bool operator>=(const ZSpanIterator& rhs) const {
+      return !(*this < rhs);
+    }
+
+    pointer _ptr = nullptr;
+#ifdef ASSERT
+    pointer _begin = nullptr;
+    pointer _end = nullptr;
+#endif
+  };
 } // namespace
 
 template<typename T, size_t Extent = dynamic_extent>
@@ -96,8 +237,8 @@ public:
   using reference        = T&;
   using const_reference  = const T&;
   using difference_type  = ptrdiff_t;
-  /* No general iterator support yet
-  using iterator         = ...;
+  using iterator         = ZSpanIterator<T>;
+  /* No reverse iterator support yet
   using reverse_iterator = ...;
   */
 
@@ -166,9 +307,13 @@ public:
   constexpr ZSpan& operator=(const ZSpan& other) = default;
   ~ZSpan() = default;
 
-  /* No general iterator support yet
-  constexpr iterator begin() const;
-  constexpr iterator end() const;
+  constexpr iterator begin() const {
+    return iterator::make_iterator(data(), data(), data() + size());
+  }
+  constexpr iterator end() const {
+    return iterator::make_iterator(data() + size(), data(), data() + size());
+  }
+  /* No reverse iterator support yet
   constexpr reverse_iterator rbegin() const;
   constexpr reverse_iterator rend() const;
   */
