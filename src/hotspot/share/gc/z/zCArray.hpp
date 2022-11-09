@@ -24,10 +24,141 @@
 #ifndef SHARE_GC_Z_ZCARRAY_HPP
 #define SHARE_GC_Z_ZCARRAY_HPP
 
-#include "utilities/globalDefinitions.hpp"
+#include "metaprogramming/removeCV.hpp"
 #include "utilities/debug.hpp"
+#include "utilities/globalDefinitions.hpp"
 
 // https://en.cppreference.com/w/cpp/container/array
+
+
+
+namespace {
+  template<typename T, size_t N>
+  struct ZCArrayIterator {
+    /* No concept support yet
+    using iterator_concept = std::contiguous_iterator_tag;
+    */
+    /* No stl support yet
+    using iterator_category = std::random_access_iterator_tag;
+    */
+    using value_type = typename RemoveCV<T>::type;
+    using difference_type = ptrdiff_t;
+    using pointer = T*;
+    using reference = T&;
+
+    constexpr operator ZCArrayIterator<const T, N>() {
+      return {_ptr, _position};
+    }
+
+    constexpr reference operator*() const {
+      precond(_position >= 0);
+      precond(_position < N);
+      return _ptr[_position];
+    }
+
+    constexpr pointer operator->() const {
+      precond(_position >= 0);
+      precond(_position < N);
+      return &_ptr[_position];
+    }
+
+    constexpr ZCArrayIterator& operator++() {
+      precond(_position >= 0);
+      precond(_position < N);
+      ++_position;
+      return *this;
+    }
+
+    constexpr ZCArrayIterator operator++(int) {
+      auto temp = *this;
+      operator++();
+      return temp;
+    }
+
+    constexpr ZCArrayIterator& operator--() {
+      precond(_position > 0);
+      precond(_position <= N);
+      --_position;
+      return *this;
+    }
+
+    constexpr ZCArrayIterator operator--(int) {
+      auto temp = *this;
+      operator--();
+      return temp;
+    }
+
+    constexpr ZCArrayIterator& operator+=(const difference_type offset) {
+      precond(_position + offset >= 0);
+      precond(_position + offset <= N);
+      _position += offset;
+      return *this;
+    }
+
+    constexpr ZCArrayIterator operator+(const difference_type offset) const {
+      auto temp = *this;
+      temp += offset;
+      return temp;
+    }
+
+    friend constexpr ZCArrayIterator& operator+(const difference_type offset, ZCArrayIterator& rhs) {
+      rhs += offset;
+      return rhs;
+    }
+
+    constexpr ZCArrayIterator& operator-=(const difference_type offset) {
+      precond(_position - offset >= 0);
+      precond(_position - offset <= N);
+      _position -= offset;
+      return *this;
+    }
+
+    constexpr ZCArrayIterator operator-(const difference_type offset) const {
+      auto temp = *this;
+      temp -= offset;
+      return temp;
+    }
+
+    constexpr difference_type operator-(const ZCArrayIterator& rhs) const {
+      precond(_ptr == rhs._ptr);
+      return _position - rhs._position;
+    }
+
+    constexpr reference operator[](const difference_type offset) const {
+      return *(operator+(offset));
+    }
+
+    constexpr bool operator==(const ZCArrayIterator& rhs) const {
+      precond(_ptr == rhs._ptr);
+      return _position == rhs._position;
+    }
+
+    constexpr bool operator!=(const ZCArrayIterator& rhs) const {
+      return !(*this == rhs);
+    }
+
+    constexpr bool operator<(const ZCArrayIterator& rhs) const {
+      precond(_ptr == rhs._ptr);
+      return _position < rhs._position;
+    }
+
+    constexpr bool operator>(const ZCArrayIterator& rhs) const {
+      precond(_ptr == rhs._ptr);
+      return _position > rhs._position;
+    }
+
+    constexpr bool operator<=(const ZCArrayIterator& rhs) const {
+      return !(*this > rhs);
+    }
+
+    constexpr bool operator>=(const ZCArrayIterator& rhs) const {
+      return !(*this < rhs);
+    }
+
+    pointer _ptr = nullptr;
+    size_t _position = 0;
+  };
+} // namespace
 
 template<typename T, size_t N>
 struct ZCArray {
@@ -38,9 +169,9 @@ struct ZCArray {
   using const_reference =	const value_type&;
   using pointer =	value_type*;
   using const_pointer =	const value_type*;
-  /* No general iterator support yet
-  using iterator =
-  using const_iterator =
+  using iterator = ZCArrayIterator<T, N>;
+  using const_iterator = ZCArrayIterator<const T, N>;
+  /* No reverse iterator support yet
   using reverse_iterator =
   using const_reverse_iterator =
   */
@@ -93,13 +224,31 @@ struct ZCArray {
     return _data;
   }
 
-  /* No general iterator support yet
-  constexpr iterator begin();
-  constexpr const_iterator begin() const;
-  constexpr const_iterator cbegin() const;
-  constexpr iterator end();
-  constexpr const_iterator end() const;
-  constexpr const_iterator cend() const;
+  constexpr iterator begin() {
+    return {data(), 0};
+  }
+
+  constexpr const_iterator begin() const {
+    return {data(), 0};
+  }
+
+  constexpr const_iterator cbegin() const {
+    return {data(), 0};
+  }
+
+  constexpr iterator end() {
+    return {data(), N};
+  }
+
+  constexpr const_iterator end() const {
+    return {data(), N};
+  }
+
+  constexpr const_iterator cend() const {
+    return {data(), N};
+  }
+
+  /* No reverse iterator support yet
   constexpr reverse_iterator rbegin();
   constexpr const_reverse_iterator rbegin() const;
   constexpr const_reverse_iterator crbegin() const;
@@ -145,9 +294,9 @@ struct ZCArray<T, 0> {
   using const_reference =	const value_type&;
   using pointer =	value_type*;
   using const_pointer =	const value_type*;
-  /* No general iterator support yet
-  using iterator =
-  using const_iterator =
+  using iterator = ZCArrayIterator<T, 0>;
+  using const_iterator = ZCArrayIterator<const T, 0>;
+  /* No reverse iterator support yet
   using reverse_iterator =
   using const_reverse_iterator =
   */
@@ -204,13 +353,31 @@ struct ZCArray<T, 0> {
     return nullptr;
   }
 
-  /* No general iterator support yet
-  constexpr iterator begin();
-  constexpr const_iterator begin() const;
-  constexpr const_iterator cbegin() const;
-  constexpr iterator end();
-  constexpr const_iterator end() const;
-  constexpr const_iterator cend() const;
+  constexpr iterator begin() {
+    return {};
+  }
+
+  constexpr const_iterator begin() const {
+    return {};
+  }
+
+  constexpr const_iterator cbegin() const {
+    return {};
+  }
+
+  constexpr iterator end() {
+    return {};
+  }
+
+  constexpr const_iterator end() const {
+    return {};
+  }
+
+  constexpr const_iterator cend() const {
+    return {};
+  }
+
+  /* No reverse iterator support yet
   constexpr reverse_iterator rbegin();
   constexpr const_reverse_iterator rbegin() const;
   constexpr const_reverse_iterator crbegin() const;
@@ -323,4 +490,5 @@ constexpr ZCArray<typename RemoveCV<T>::type, N> to_array(T (&a)[N]);
 template<class T, size_t N>
 constexpr ZCArray<typename RemoveCV<T>::type, N> to_array(T (&&a)[N]);
 */
+
 #endif // SHARE_GC_Z_ZCARRAY_HPP

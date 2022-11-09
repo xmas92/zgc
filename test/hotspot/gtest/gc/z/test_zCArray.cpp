@@ -26,8 +26,6 @@
 #include "utilities/debug.hpp"
 #include "unittest.hpp"
 
-#ifndef PRODUCT
-
 TEST(ZCArray, construction_empty) {
   using T = int;
   {
@@ -176,7 +174,7 @@ TEST_VM_ASSERT(ZCArray, overflow_const_operator_at) {
   const ZCArray<T, size> a{};
   static_cast<void>(a[size]);
 }
-#endif
+#endif // ASSERT
 
 constexpr auto guarantee = "guarantee";
 
@@ -267,4 +265,134 @@ TEST(ZCArray, operator_cmp) {
 #undef EXPECT_OP
 }
 
-#endif // PRODUCT
+TEST(ZCArray, iterator) {
+  using T = int;
+  constexpr size_t size = 10;
+  STATIC_ASSERT(size % 2 == 0);
+  ZCArray<T, size> a{};
+  {
+    T value{};
+    for (T& v : a) {
+      v = value++;
+    }
+  }
+  {
+    T value{};
+    for (const T& v : a) {
+      EXPECT_TRUE(v == value++);
+    }
+  }
+  {
+    const auto cb = a.cbegin();
+    const auto ce = a.cend();
+    T i{};
+    for (const T& v : a) {
+      EXPECT_TRUE(cb[i] == v);
+      EXPECT_TRUE(ce[-(size - i++)] == v);
+    }
+  }
+  {
+    T value{};
+    for (auto it = a.begin(), end = a.end(); it != end; ++it) {
+      *it = 0;
+    }
+  }
+  {
+    for (auto it = a.cbegin(), end = a.cend(); it != end; ++it) {
+      EXPECT_TRUE(*it == 0);
+    }
+  }
+  {
+    auto b = a.begin(), e = a.end();
+    b += size / 2;
+    e -= size / 2;
+    EXPECT_TRUE(b == e);
+    b += size / 2;
+    e -= size / 2;
+    EXPECT_TRUE(a.begin() == e);
+    EXPECT_TRUE(b == a.end());
+
+    auto cb = a.cbegin(), ce = a.cend();
+    cb += size / 2;
+    ce -= size / 2;
+    EXPECT_TRUE(cb == ce);
+    cb += size / 2;
+    ce -= size / 2;
+    EXPECT_TRUE(a.cbegin() == ce);
+    EXPECT_TRUE(cb == a.cend());
+  }
+  {
+    const auto test = [&](auto b, auto e) {
+      EXPECT_TRUE(b < e);
+      EXPECT_TRUE(b <= e);
+      EXPECT_FALSE(b > e);
+      EXPECT_FALSE(b >= e);
+      EXPECT_TRUE(b != e);
+      EXPECT_FALSE(b == e);
+
+      EXPECT_TRUE((b + (size / 2)) == (e - (size / 2)));
+      EXPECT_TRUE((e - b) == size);
+      EXPECT_TRUE((b - e) == -static_cast<ptrdiff_t>(size));
+    };
+
+    test(a.begin(), a.end());
+    test(a.cbegin(), a.cend());
+    STATIC_ASSERT((a.begin() + 10)._ptr);
+  }
+  {
+    ZCArray<T, 0> za;
+    const auto test = [&](auto b, auto e) {
+      EXPECT_FALSE(b < e);
+      EXPECT_TRUE(b <= e);
+      EXPECT_FALSE(b > e);
+      EXPECT_TRUE(b >= e);
+      EXPECT_FALSE(b != e);
+      EXPECT_TRUE(b == e);
+
+      EXPECT_TRUE(b == e);
+      EXPECT_TRUE((e - b) == 0);
+      EXPECT_TRUE((b - e) == 0);
+    };
+
+    test(za.begin(), za.end());
+    test(za.cbegin(), za.cend());
+  }
+}
+
+#ifdef ASSERT
+TEST_VM_ASSERT(ZCArray, different_iter) {
+  using T = int;
+  constexpr size_t size = 10;
+  ZCArray<T, size> a{};
+  ZCArray<T, size> b{};
+  static_cast<void>(a.begin() < b.begin());
+}
+
+TEST_VM_ASSERT(ZCArray, underflow) {
+  using T = int;
+  constexpr size_t size = 10;
+  ZCArray<T, size> a{};
+  static_cast<void>(--a.begin());
+}
+
+TEST_VM_ASSERT(ZCArray, overflow) {
+  using T = int;
+  constexpr size_t size = 10;
+  ZCArray<T, size> a{};
+  static_cast<void>(++a.end());
+}
+
+TEST_VM_ASSERT(ZCArray, underflow_at) {
+  using T = int;
+  constexpr size_t size = 10;
+  ZCArray<T, size> a{};
+  static_cast<void>(a.begin()[-1]);
+}
+
+TEST_VM_ASSERT(ZCArray, overflow_at) {
+  using T = int;
+  constexpr size_t size = 10;
+  ZCArray<T, size> a{};
+  static_cast<void>(*a.end());
+}
+#endif // ASSERT
