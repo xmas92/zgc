@@ -337,7 +337,8 @@ TEST(ZCArray, iterator) {
 
     test(a.begin(), a.end());
     test(a.cbegin(), a.cend());
-    STATIC_ASSERT((a.begin() + 10)._ptr);
+    STATIC_ASSERT(&*(a.begin() + 9));
+    STATIC_ASSERT(&*(a.end() - 10));
   }
   {
     ZCArray<T, 0> za;
@@ -358,6 +359,123 @@ TEST(ZCArray, iterator) {
     test(za.cbegin(), za.cend());
   }
 }
+
+TEST(ZCArray, reverse_iterator) {
+  using T = int;
+  constexpr size_t size = 10;
+  STATIC_ASSERT(size % 2 == 0);
+  using ArrayT = ZCArray<T, size>;
+  ArrayT a{};
+
+  struct ReverseAdapter {
+    ReverseAdapter(ArrayT& a) : _a(a) { }
+    typename ArrayT::reverse_iterator begin() {
+      return _a.rbegin();
+    }
+    typename ArrayT::reverse_iterator end() {
+      return _a.rend();
+    }
+  private:
+    ArrayT& _a;
+  };
+
+  {
+    T value{};
+    for (T& v : ReverseAdapter(a)) {
+      v = value++;
+    }
+  }
+  {
+    T value{};
+    for (const T& v : ReverseAdapter(a)) {
+      EXPECT_TRUE(v == value++);
+    }
+  }
+  {
+    T value{size};
+    for (const T& v : a) {
+      EXPECT_TRUE(v == --value);
+    }
+  }
+  {
+    const auto cb = a.crbegin();
+    const auto ce = a.crend();
+    T i{};
+    for (const T& v : ReverseAdapter(a)) {
+      EXPECT_TRUE(cb[i] == v);
+      EXPECT_TRUE(ce[-(size - i++)] == v);
+    }
+  }
+  {
+    T value{};
+    for (auto it = a.rbegin(), end = a.rend(); it != end; ++it) {
+      *it = 0;
+    }
+  }
+  {
+    for (auto it = a.crbegin(), end = a.crend(); it != end; ++it) {
+      EXPECT_TRUE(*it == 0);
+    }
+  }
+  {
+    auto b = a.rbegin(), e = a.rend();
+    b += size / 2;
+    e -= size / 2;
+    EXPECT_TRUE(b == e);
+    b += size / 2;
+    e -= size / 2;
+    EXPECT_TRUE(a.rbegin() == e);
+    EXPECT_TRUE(b == a.rend());
+
+    auto cb = a.crbegin(), ce = a.crend();
+    cb += size / 2;
+    ce -= size / 2;
+    EXPECT_TRUE(cb == ce);
+    cb += size / 2;
+    ce -= size / 2;
+    EXPECT_TRUE(a.crbegin() == ce);
+    EXPECT_TRUE(cb == a.crend());
+  }
+  {
+    const auto test = [&](auto b, auto e) {
+      EXPECT_TRUE(b < e);
+      EXPECT_TRUE(b <= e);
+      EXPECT_FALSE(b > e);
+      EXPECT_FALSE(b >= e);
+      EXPECT_TRUE(b != e);
+      EXPECT_FALSE(b == e);
+
+      EXPECT_TRUE((b + (size / 2)) == (e - (size / 2)));
+      EXPECT_TRUE((e - b) == size);
+      EXPECT_TRUE((b - e) == -static_cast<ptrdiff_t>(size));
+    };
+
+    test(a.rbegin(), a.rend());
+    test(a.crbegin(), a.crend());
+    STATIC_ASSERT(&*(a.rbegin() + 9));
+    STATIC_ASSERT(&*(a.rend() - 10));
+  }
+  {
+    ZCArray<T, 0> za;
+    const auto test = [&](auto b, auto e) {
+      EXPECT_FALSE(b < e);
+      EXPECT_TRUE(b <= e);
+      EXPECT_FALSE(b > e);
+      EXPECT_TRUE(b >= e);
+      EXPECT_FALSE(b != e);
+      EXPECT_TRUE(b == e);
+
+      EXPECT_TRUE(b == e);
+      EXPECT_TRUE((e - b) == 0);
+      EXPECT_TRUE((b - e) == 0);
+    };
+
+    test(za.rbegin(), za.rend());
+    test(za.crbegin(), za.crend());
+  }
+}
+
+// TODO(Axel): Maybe add some more reverse iterator tests
 
 #ifdef ASSERT
 TEST_VM_ASSERT(ZCArray, different_iter) {

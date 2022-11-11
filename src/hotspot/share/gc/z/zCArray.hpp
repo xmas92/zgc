@@ -25,6 +25,7 @@
 #define SHARE_GC_Z_ZCARRAY_HPP
 
 #include "metaprogramming/removeCV.hpp"
+#include "gc/z/zReverseIterator.hpp"
 #include "utilities/debug.hpp"
 #include "utilities/globalDefinitions.hpp"
 
@@ -171,10 +172,8 @@ struct ZCArray {
   using const_pointer =	const value_type*;
   using iterator = ZCArrayIterator<T, N>;
   using const_iterator = ZCArrayIterator<const T, N>;
-  /* No reverse iterator support yet
-  using reverse_iterator =
-  using const_reverse_iterator =
-  */
+  using reverse_iterator = ZReveserIterator<iterator>;
+  using const_reverse_iterator = ZReveserIterator<const_iterator>;
 
   // TODO(Axel): Should probably check and crash in release
   constexpr reference at(size_type pos) {
@@ -248,14 +247,29 @@ struct ZCArray {
     return {data(), N};
   }
 
-  /* No reverse iterator support yet
-  constexpr reverse_iterator rbegin();
-  constexpr const_reverse_iterator rbegin() const;
-  constexpr const_reverse_iterator crbegin() const;
-  constexpr reverse_iterator rend();
-  constexpr const_reverse_iterator rend() const;
-  constexpr const_reverse_iterator crend() const;
-  */
+  constexpr reverse_iterator rbegin() {
+    return reverse_iterator{end()};
+  }
+
+  constexpr const_reverse_iterator rbegin() const {
+    return const_reverse_iterator{end()};
+  }
+
+  constexpr const_reverse_iterator crbegin() const {
+    return const_reverse_iterator{cend()};
+  }
+
+  constexpr reverse_iterator rend() {
+    return reverse_iterator{begin()};
+  }
+
+  constexpr const_reverse_iterator rend() const {
+    return const_reverse_iterator{begin()};
+  }
+
+  constexpr const_reverse_iterator crend() const {
+    return const_reverse_iterator{cbegin()};
+  }
 
   // Add [[nodiscard]] C++17
   constexpr bool empty() const {
@@ -296,10 +310,8 @@ struct ZCArray<T, 0> {
   using const_pointer =	const value_type*;
   using iterator = ZCArrayIterator<T, 0>;
   using const_iterator = ZCArrayIterator<const T, 0>;
-  /* No reverse iterator support yet
-  using reverse_iterator =
-  using const_reverse_iterator =
-  */
+  using reverse_iterator = ZReveserIterator<iterator>;
+  using const_reverse_iterator = ZReveserIterator<const_iterator>;
 
   // TODO(Axel): Add [[noreturn]] attribute if error_is_suppressed is ever changed
   constexpr reference at(size_type) {
@@ -377,14 +389,29 @@ struct ZCArray<T, 0> {
     return {};
   }
 
-  /* No reverse iterator support yet
-  constexpr reverse_iterator rbegin();
-  constexpr const_reverse_iterator rbegin() const;
-  constexpr const_reverse_iterator crbegin() const;
-  constexpr reverse_iterator rend();
-  constexpr const_reverse_iterator rend() const;
-  constexpr const_reverse_iterator crend() const;
-  */
+  constexpr reverse_iterator rbegin() {
+    return {};
+  }
+
+  constexpr const_reverse_iterator rbegin() const {
+    return {};
+  }
+
+  constexpr const_reverse_iterator crbegin() const {
+    return {};
+  }
+
+  constexpr reverse_iterator rend() {
+    return {};
+  }
+
+  constexpr const_reverse_iterator rend() const {
+    return {};
+  }
+
+  constexpr const_reverse_iterator crend() const {
+    return {};
+  }
 
   // Add [[nodiscard]] C++17
   constexpr bool empty() const {
