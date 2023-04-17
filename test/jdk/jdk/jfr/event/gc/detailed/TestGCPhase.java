@@ -43,6 +43,7 @@ public class TestGCPhase {
         try (Recording recording = new Recording()) {
             // Activate the event we are interested in and start recording
             recording.enable(EventNames.GCPhase);
+            recording.enable(EventNames.GCPhaseLevel1);
             recording.start();
 
             // Run GC to get gc phase
@@ -55,6 +56,9 @@ public class TestGCPhase {
             // No use of EventNames.GCPhase yet
             // Events.hasEvents(events);
             // Events.hasEvent(events, EventNames.GCPhase);
+
+            // No use of EventNames.GCPhaseLevel1 yet
+            // Events.hasEvent(events, EventNames.GCPhaseLevel1);
 
             for (RecordedEvent event : events) {
                 System.out.println("Event:" + event);

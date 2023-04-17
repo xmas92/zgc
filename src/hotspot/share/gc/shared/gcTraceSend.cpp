@@ -328,10 +328,11 @@ class PhaseSender : public PhaseVisitor {
   }
 
   void visit_mixed(GCPhase* phase) {
-    assert(phase->level() < 1, "There is only one level for MixedPhase");
+    assert(phase->level() < 2, "There are only two levels for MixedPhase");
 
     switch (phase->level()) {
       case 0: send_phase<EventGCPhase>(phase); break;
+      case 1: send_phase<EventGCPhaseLevel1>(phase); break;
       default: /* Ignore sending this phase */ break;
     }
   }

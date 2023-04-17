@@ -142,6 +142,7 @@ public class EventNames {
     public static final String GCPhaseConcurrentLevel1 = PREFIX + "GCPhaseConcurrentLevel1";
     public static final String GCPhaseConcurrentLevel2 = PREFIX + "GCPhaseConcurrentLevel2";
     public static final String GCPhase = PREFIX + "GCPhase";
+    public static final String GCPhaseLevel1 = PREFIX + "GCPhaseLevel1";
     public static final String ZYoungGarbageCollection = PREFIX + "ZYoungGarbageCollection";
     public static final String ZOldGarbageCollection = PREFIX + "ZOldGarbageCollection";
     public static final String ZAllocationStall = PREFIX + "ZAllocationStall";
