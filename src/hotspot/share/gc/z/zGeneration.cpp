@@ -962,13 +962,13 @@ ZGenerationOld::ZGenerationOld(ZPageTable* page_table, ZPageAllocator* page_allo
 
 class ZGenerationCollectionScopeOld : public StackObj {
 private:
-  ZStatTimer      _stat_timer;
-  ZDriverUnlocker _unlocker;
+  ZStatTimer         _stat_timer;
+  ZDriverUnlockerOld _unlocker;
 
 public:
   ZGenerationCollectionScopeOld(MixedGCTimer* gc_timer) :
       _stat_timer(ZPhaseGenerationOld, gc_timer),
-      _unlocker() {
+      _unlocker(gc_timer) {
     // Update statistics and set the GC timer
     ZGeneration::old()->at_collection_start(gc_timer);
   }
@@ -1023,7 +1023,7 @@ void ZGenerationOld::collect(MixedGCTimer* timer) {
   abortpoint();
 
   {
-    ZDriverLocker locker;
+    ZDriverLockerOld locker;
 
     // Phase 8: Concurrent Remap Roots
     concurrent_remap_young_roots();
@@ -1135,7 +1135,7 @@ void ZGenerationOld::pause_verify() {
   // young collections during this verification.
   if (ZVerifyRoots || ZVerifyObjects) {
     // Limited verification
-    ZDriverLocker locker;
+    ZDriverLockerOld locker;
     VM_ZVerifyOld().pause();
   }
 }

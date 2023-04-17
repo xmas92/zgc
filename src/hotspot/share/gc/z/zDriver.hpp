@@ -36,7 +36,8 @@ class VM_ZOperation;
 
 class ZDriver : public ZThread {
   friend class ZDriverLocker;
-  friend class ZDriverUnlocker;
+  friend class ZDriverLockerOld;
+  friend class ZDriverUnlockerOld;
 
 private:
   static ZLock*        _lock;
@@ -126,10 +127,19 @@ public:
   ~ZDriverLocker();
 };
 
-class ZDriverUnlocker : public StackObj {
+class ZDriverLockerOld : public StackObj {
 public:
-  ZDriverUnlocker();
-  ~ZDriverUnlocker();
+  ZDriverLockerOld();
+  ~ZDriverLockerOld();
+};
+
+class ZDriverUnlockerOld : public StackObj {
+private:
+  const ZStatPhase* _phase;
+  MixedGCTimer* _gc_timer;
+public:
+  ZDriverUnlockerOld(MixedGCTimer* gc_timer);
+  ~ZDriverUnlockerOld();
 };
 
 #endif // SHARE_GC_Z_ZDRIVER_HPP

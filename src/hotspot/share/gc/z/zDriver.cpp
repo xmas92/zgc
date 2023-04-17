@@ -40,6 +40,8 @@
 static const ZStatPhaseCollection ZPhaseCollectionMinor("Minor Collection", true /* minor */);
 static const ZStatPhaseCollection ZPhaseCollectionMajor("Major Collection", false /* minor */);
 
+static const ZStatSubPhase        ZSubPhaseDriverLockOld("DriverLock Locking", ZGenerationId::old);
+
 template <typename DriverT>
 class ZGCCauseSetter : public GCCauseSetter {
 private:
@@ -97,12 +99,34 @@ ZDriverLocker::~ZDriverLocker() {
   ZDriver::unlock();
 }
 
-ZDriverUnlocker::ZDriverUnlocker() {
+ZDriverLockerOld::ZDriverLockerOld() {
+  MixedGCTimer* const timer = ZGeneration::old()->gc_timer();
+  const Ticks start = Ticks::now();
+
+  ZSubPhaseDriverLockOld.register_start(timer, start);
+
+  ZDriver::lock();
+
+  ZSubPhaseDriverLockOld.register_end(timer, start, Ticks::now());
+}
+
+ZDriverLockerOld::~ZDriverLockerOld() {
   ZDriver::unlock();
 }
 
-ZDriverUnlocker::~ZDriverUnlocker() {
+ZDriverUnlockerOld::ZDriverUnlockerOld(MixedGCTimer* gc_timer) :
+    _gc_timer(gc_timer) {
+  ZDriver::unlock();
+}
+
+ZDriverUnlockerOld::~ZDriverUnlockerOld() {
+  const Ticks start = Ticks::now();
+
+  ZSubPhaseDriverLockOld.register_start(_gc_timer, start);
+
   ZDriver::lock();
+
+  ZSubPhaseDriverLockOld.register_end(_gc_timer, start, Ticks::now());
 }
 
 ZDriver::ZDriver() :
