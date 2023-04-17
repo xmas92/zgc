@@ -73,6 +73,9 @@ static const ZStatPhaseGeneration ZPhaseGenerationYoung[] {
 
 static const ZStatPhaseGeneration ZPhaseGenerationOld("Old Generation", ZGenerationId::old);
 
+static const ZStatSubPhase        ZSubPhaseSafepointSyncYoung("Safepoint Synchronize", ZGenerationId::young);
+static const ZStatSubPhase        ZSubPhaseSafepointSyncOld("Safepoint Synchronize", ZGenerationId::old);
+
 static const ZStatPhasePause      ZPhasePauseMarkStartYoung("Pause Mark Start", ZGenerationId::young);
 static const ZStatPhasePause      ZPhasePauseMarkStartYoungAndOld("Pause Mark Start (Major)", ZGenerationId::young);
 static const ZStatPhaseConcurrent ZPhaseConcurrentMarkYoung("Concurrent Mark", ZGenerationId::young);
@@ -463,6 +466,24 @@ public:
   }
 };
 
+class VM_ZOperationYoung : public VM_ZOperation {
+private:
+  ZStatTimerYoung _timer;
+public:
+  VM_ZOperationYoung() :
+      VM_ZOperation(),
+      _timer(ZSubPhaseSafepointSyncYoung) {}
+};
+
+class VM_ZOperationOld : public VM_ZOperation {
+private:
+  ZStatTimerOld _timer;
+public:
+  VM_ZOperationOld() :
+      VM_ZOperation(),
+      _timer(ZSubPhaseSafepointSyncOld) {}
+};
+
 ZYoungTypeSetter::ZYoungTypeSetter(ZYoungType type) {
   assert(ZGeneration::young()->_active_type == ZYoungType::none, "Invalid type");
   ZGeneration::young()->_active_type = type;
@@ -557,7 +578,7 @@ void ZGenerationYoung::collect(ZYoungType type, MixedGCTimer* timer) {
   concurrent_relocate();
 }
 
-class VM_ZMarkStartYoungAndOld : public VM_ZOperation {
+class VM_ZMarkStartYoungAndOld : public VM_ZOperationYoung {
 public:
   virtual VMOp_Type type() const {
     return VMOp_ZMarkStartYoungAndOld;
@@ -578,7 +599,7 @@ public:
   }
 };
 
-class VM_ZMarkStartYoung : public VM_ZOperation {
+class VM_ZMarkStartYoung : public VM_ZOperationYoung {
 public:
   virtual VMOp_Type type() const {
     return VMOp_ZMarkStartYoung;
@@ -625,7 +646,7 @@ void ZGenerationYoung::concurrent_mark() {
   mark_follow();
 }
 
-class VM_ZMarkEndYoung : public VM_ZOperation {
+class VM_ZMarkEndYoung : public VM_ZOperationYoung {
 public:
   virtual VMOp_Type type() const {
     return VMOp_ZMarkEndYoung;
@@ -781,7 +802,7 @@ void ZGenerationYoung::concurrent_select_relocation_set() {
   select_relocation_set(_id, promote_all);
 }
 
-class VM_ZRelocateStartYoung : public VM_ZOperation {
+class VM_ZRelocateStartYoung : public VM_ZOperationYoung {
 public:
   virtual VMOp_Type type() const {
     return VMOp_ZRelocateStartYoung;
@@ -1039,7 +1060,7 @@ void ZGenerationOld::concurrent_mark() {
   ZBreakpoint::at_before_marking_completed();
 }
 
-class VM_ZMarkEndOld : public VM_ZOperation {
+class VM_ZMarkEndOld : public VM_ZOperationOld {
 public:
   virtual VMOp_Type type() const {
     return VMOp_ZMarkEndOld;
@@ -1116,7 +1137,7 @@ void ZGenerationOld::concurrent_select_relocation_set() {
   select_relocation_set(_id, false /* promote_all */);
 }
 
-class VM_ZRelocateStartOld : public VM_ZOperation {
+class VM_ZRelocateStartOld : public VM_ZOperationOld {
 public:
   virtual VMOp_Type type() const {
     return VMOp_ZRelocateStartOld;

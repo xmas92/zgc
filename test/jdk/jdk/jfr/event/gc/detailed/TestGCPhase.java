@@ -55,9 +55,7 @@ public class TestGCPhase {
             List<RecordedEvent> events = Events.fromRecording(recording);
             Events.hasEvents(events);
             Events.hasEvent(events, EventNames.GCPhase);
-
-            // No use of EventNames.GCPhaseLevel1 yet
-            // Events.hasEvent(events, EventNames.GCPhaseLevel1);
+            Events.hasEvent(events, EventNames.GCPhaseLevel1);
 
             for (RecordedEvent event : events) {
                 System.out.println("Event:" + event);
