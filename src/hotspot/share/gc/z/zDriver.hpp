@@ -65,10 +65,10 @@ public:
 
 class ZDriverMinor : public ZDriver {
 private:
-  ZDriverPort       _port;
-  ConcurrentGCTimer _gc_timer;
-  ZMinorTracer      _jfr_tracer;
-  size_t            _used_at_start;
+  ZDriverPort  _port;
+  MixedGCTimer _gc_timer;
+  ZMinorTracer _jfr_tracer;
+  size_t       _used_at_start;
 
   void gc(const ZDriverRequest& request);
   void handle_alloc_stalls() const;
@@ -92,10 +92,10 @@ public:
 
 class ZDriverMajor : public ZDriver {
 private:
-  ZDriverPort       _port;
-  ConcurrentGCTimer _gc_timer;
-  ZMajorTracer      _jfr_tracer;
-  size_t            _used_at_start;
+  ZDriverPort  _port;
+  MixedGCTimer _gc_timer;
+  ZMajorTracer _jfr_tracer;
+  size_t       _used_at_start;
 
   void collect_young(const ZDriverRequest& request);
 

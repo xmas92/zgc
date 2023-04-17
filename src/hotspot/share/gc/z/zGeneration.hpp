@@ -83,7 +83,7 @@ protected:
   ZStatMark             _stat_mark;
   ZStatRelocation       _stat_relocation;
 
-  ConcurrentGCTimer*    _gc_timer;
+  MixedGCTimer*         _gc_timer;
 
   void free_empty_pages(ZRelocationSetSelector* selector, int bulk);
   void flip_age_pages(const ZRelocationSetSelector* selector);
@@ -129,8 +129,8 @@ public:
   size_t compacted() const;
   void increase_compacted(size_t size);
 
-  ConcurrentGCTimer* gc_timer() const;
-  void set_gc_timer(ConcurrentGCTimer* gc_timer);
+  MixedGCTimer* gc_timer() const;
+  void set_gc_timer(MixedGCTimer* gc_timer);
   void clear_gc_timer();
 
   ZStatHeap* stat_heap();
@@ -139,7 +139,7 @@ public:
   ZStatMark* stat_mark();
   ZStatRelocation* stat_relocation();
 
-  void at_collection_start(ConcurrentGCTimer* gc_timer);
+  void at_collection_start(MixedGCTimer* gc_timer);
   void at_collection_end();
 
   // Workers
@@ -227,7 +227,7 @@ public:
 
   ZYoungType type() const;
 
-  void collect(ZYoungType type, ConcurrentGCTimer* timer);
+  void collect(ZYoungType type, MixedGCTimer* timer);
 
   // Statistics
   bool should_record_stats();
@@ -300,7 +300,7 @@ private:
 public:
   ZGenerationOld(ZPageTable* page_table, ZPageAllocator* page_allocator);
 
-  void collect(ConcurrentGCTimer* timer);
+  void collect(MixedGCTimer* timer);
 
   // Statistics
   bool should_record_stats();

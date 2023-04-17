@@ -221,8 +221,8 @@ protected:
 public:
   const char* name() const;
 
-  virtual void register_start(ConcurrentGCTimer* timer, const Ticks& start) const = 0;
-  virtual void register_end(ConcurrentGCTimer* timer, const Ticks& start, const Ticks& end) const = 0;
+  virtual void register_start(MixedGCTimer* timer, const Ticks& start) const = 0;
+  virtual void register_end(MixedGCTimer* timer, const Ticks& start, const Ticks& end) const = 0;
 };
 
 class ZStatPhaseCollection : public ZStatPhase {
@@ -237,8 +237,8 @@ private:
 public:
   ZStatPhaseCollection(const char* name, bool minor);
 
-  virtual void register_start(ConcurrentGCTimer* timer, const Ticks& start) const;
-  virtual void register_end(ConcurrentGCTimer* timer, const Ticks& start, const Ticks& end) const;
+  virtual void register_start(MixedGCTimer* timer, const Ticks& start) const;
+  virtual void register_end(MixedGCTimer* timer, const Ticks& start, const Ticks& end) const;
 };
 
 class ZStatPhaseGeneration : public ZStatPhase {
@@ -250,8 +250,8 @@ private:
 public:
   ZStatPhaseGeneration(const char* name, ZGenerationId id);
 
-  virtual void register_start(ConcurrentGCTimer* timer, const Ticks& start) const;
-  virtual void register_end(ConcurrentGCTimer* timer, const Ticks& start, const Ticks& end) const;
+  virtual void register_start(MixedGCTimer* timer, const Ticks& start) const;
+  virtual void register_end(MixedGCTimer* timer, const Ticks& start, const Ticks& end) const;
 };
 
 class ZStatPhasePause : public ZStatPhase {
@@ -263,24 +263,24 @@ public:
 
   static const Tickspan& max();
 
-  virtual void register_start(ConcurrentGCTimer* timer, const Ticks& start) const;
-  virtual void register_end(ConcurrentGCTimer* timer, const Ticks& start, const Ticks& end) const;
+  virtual void register_start(MixedGCTimer* timer, const Ticks& start) const;
+  virtual void register_end(MixedGCTimer* timer, const Ticks& start, const Ticks& end) const;
 };
 
 class ZStatPhaseConcurrent : public ZStatPhase {
 public:
   ZStatPhaseConcurrent(const char* name, ZGenerationId id);
 
-  virtual void register_start(ConcurrentGCTimer* timer, const Ticks& start) const;
-  virtual void register_end(ConcurrentGCTimer* timer, const Ticks& start, const Ticks& end) const;
+  virtual void register_start(MixedGCTimer* timer, const Ticks& start) const;
+  virtual void register_end(MixedGCTimer* timer, const Ticks& start, const Ticks& end) const;
 };
 
 class ZStatSubPhase : public ZStatPhase {
 public:
   ZStatSubPhase(const char* name, ZGenerationId id);
 
-  virtual void register_start(ConcurrentGCTimer* timer, const Ticks& start) const;
-  virtual void register_end(ConcurrentGCTimer* timer, const Ticks& start, const Ticks& end) const;
+  virtual void register_start(MixedGCTimer* timer, const Ticks& start) const;
+  virtual void register_end(MixedGCTimer* timer, const Ticks& start, const Ticks& end) const;
 };
 
 class ZStatCriticalPhase : public ZStatPhase {
@@ -291,8 +291,8 @@ private:
 public:
   ZStatCriticalPhase(const char* name, bool verbose = true);
 
-  virtual void register_start(ConcurrentGCTimer* timer, const Ticks& start) const;
-  virtual void register_end(ConcurrentGCTimer* timer, const Ticks& start, const Ticks& end) const;
+  virtual void register_start(MixedGCTimer* timer, const Ticks& start) const;
+  virtual void register_end(MixedGCTimer* timer, const Ticks& start, const Ticks& end) const;
 };
 
 //
@@ -300,12 +300,12 @@ public:
 //
 class ZStatTimer : public StackObj {
 private:
-  ConcurrentGCTimer* _gc_timer;
+  MixedGCTimer*      _gc_timer;
   const ZStatPhase&  _phase;
   const Ticks        _start;
 
 public:
-  ZStatTimer(const ZStatPhase& phase, ConcurrentGCTimer* gc_timer) :
+  ZStatTimer(const ZStatPhase& phase, MixedGCTimer* gc_timer) :
       _gc_timer(gc_timer),
       _phase(phase),
       _start(Ticks::now()) {

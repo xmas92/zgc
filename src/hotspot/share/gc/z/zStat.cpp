@@ -650,7 +650,7 @@ size_t ZStatPhaseCollection::used_at_start() const {
       : ZDriver::major()->used_at_start();
 }
 
-void ZStatPhaseCollection::register_start(ConcurrentGCTimer* timer, const Ticks& start) const {
+void ZStatPhaseCollection::register_start(MixedGCTimer* timer, const Ticks& start) const {
   const GCCause::Cause cause = _minor ? ZDriver::minor()->gc_cause() : ZDriver::major()->gc_cause();
 
   timer->register_gc_start(start);
@@ -663,7 +663,7 @@ void ZStatPhaseCollection::register_start(ConcurrentGCTimer* timer, const Ticks&
   log_info(gc)("%s (%s)", name(), GCCause::to_string(cause));
 }
 
-void ZStatPhaseCollection::register_end(ConcurrentGCTimer* timer, const Ticks& start, const Ticks& end) const {
+void ZStatPhaseCollection::register_end(MixedGCTimer* timer, const Ticks& start, const Ticks& end) const {
   const GCCause::Cause cause = _minor ? ZDriver::minor()->gc_cause() : ZDriver::major()->gc_cause();
 
   if (ZAbort::should_abort()) {
@@ -699,21 +699,25 @@ ZGenerationTracer* ZStatPhaseGeneration::jfr_tracer() const {
       : ZGeneration::old()->jfr_tracer();
 }
 
-void ZStatPhaseGeneration::register_start(ConcurrentGCTimer* timer, const Ticks& start) const {
+void ZStatPhaseGeneration::register_start(MixedGCTimer* timer, const Ticks& start) const {
   ZCollectedHeap::heap()->print_heap_before_gc();
+
+  timer->register_gc_mixed_start(name(), start);
 
   jfr_tracer()->report_start(start);
 
   log_info(gc, phases)("%s", name());
 }
 
-void ZStatPhaseGeneration::register_end(ConcurrentGCTimer* timer, const Ticks& start, const Ticks& end) const {
+void ZStatPhaseGeneration::register_end(MixedGCTimer* timer, const Ticks& start, const Ticks& end) const {
   if (ZAbort::should_abort()) {
     log_info(gc, phases)("%s Aborted", name());
     return;
   }
 
   jfr_tracer()->report_end(end);
+
+  timer->register_gc_mixed_end(end);
 
   ZCollectedHeap::heap()->print_heap_after_gc();
 
@@ -755,14 +759,14 @@ const Tickspan& ZStatPhasePause::max() {
   return _max;
 }
 
-void ZStatPhasePause::register_start(ConcurrentGCTimer* timer, const Ticks& start) const {
+void ZStatPhasePause::register_start(MixedGCTimer* timer, const Ticks& start) const {
   timer->register_gc_pause_start(name(), start);
 
   LogTarget(Debug, gc, phases, start) log;
   log_start(log);
 }
 
-void ZStatPhasePause::register_end(ConcurrentGCTimer* timer, const Ticks& start, const Ticks& end) const {
+void ZStatPhasePause::register_end(MixedGCTimer* timer, const Ticks& start, const Ticks& end) const {
   timer->register_gc_pause_end(end);
 
   const Tickspan duration = end - start;
@@ -783,14 +787,14 @@ void ZStatPhasePause::register_end(ConcurrentGCTimer* timer, const Ticks& start,
 ZStatPhaseConcurrent::ZStatPhaseConcurrent(const char* name, ZGenerationId id) :
     ZStatPhase(id == ZGenerationId::young ? "Young Phase" : "Old Phase", name) {}
 
-void ZStatPhaseConcurrent::register_start(ConcurrentGCTimer* timer, const Ticks& start) const {
+void ZStatPhaseConcurrent::register_start(MixedGCTimer* timer, const Ticks& start) const {
   timer->register_gc_concurrent_start(name(), start);
 
   LogTarget(Debug, gc, phases, start) log;
   log_start(log);
 }
 
-void ZStatPhaseConcurrent::register_end(ConcurrentGCTimer* timer, const Ticks& start, const Ticks& end) const {
+void ZStatPhaseConcurrent::register_end(MixedGCTimer* timer, const Ticks& start, const Ticks& end) const {
   if (ZAbort::should_abort()) {
     return;
   }
@@ -807,7 +811,7 @@ void ZStatPhaseConcurrent::register_end(ConcurrentGCTimer* timer, const Ticks& s
 ZStatSubPhase::ZStatSubPhase(const char* name, ZGenerationId id) :
     ZStatPhase(id == ZGenerationId::young ? "Young Subphase" : "Old Subphase", name) {}
 
-void ZStatSubPhase::register_start(ConcurrentGCTimer* timer, const Ticks& start) const {
+void ZStatSubPhase::register_start(MixedGCTimer* timer, const Ticks& start) const {
   if (timer != nullptr) {
     assert(!Thread::current()->is_Worker_thread(), "Unexpected timer value");
     timer->register_gc_phase_start(name(), start);
@@ -822,7 +826,7 @@ void ZStatSubPhase::register_start(ConcurrentGCTimer* timer, const Ticks& start)
   }
 }
 
-void ZStatSubPhase::register_end(ConcurrentGCTimer* timer, const Ticks& start, const Ticks& end) const {
+void ZStatSubPhase::register_end(MixedGCTimer* timer, const Ticks& start, const Ticks& end) const {
   if (ZAbort::should_abort()) {
     return;
   }
@@ -851,14 +855,14 @@ ZStatCriticalPhase::ZStatCriticalPhase(const char* name, bool verbose) :
     _counter("Critical", name, ZStatUnitOpsPerSecond),
     _verbose(verbose) {}
 
-void ZStatCriticalPhase::register_start(ConcurrentGCTimer* timer, const Ticks& start) const {
+void ZStatCriticalPhase::register_start(MixedGCTimer* timer, const Ticks& start) const {
   // This is called from sensitive contexts, for example before an allocation stall
   // has been resolved. This means we must not access any oops in here since that
   // could lead to infinite recursion. Without access to the thread name we can't
   // really log anything useful here.
 }
 
-void ZStatCriticalPhase::register_end(ConcurrentGCTimer* timer, const Ticks& start, const Ticks& end) const {
+void ZStatCriticalPhase::register_end(MixedGCTimer* timer, const Ticks& start, const Ticks& end) const {
   ZTracer::report_thread_phase(name(), start, end);
 
   const Tickspan duration = end - start;

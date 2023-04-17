@@ -175,7 +175,7 @@ private:
   ZServiceabilityCycleTracer   _tracer;
 
 public:
-  ZDriverScopeMinor(const ZDriverRequest& request, ConcurrentGCTimer* gc_timer) :
+  ZDriverScopeMinor(const ZDriverRequest& request, MixedGCTimer* gc_timer) :
       _gc_id(),
       _gc_cause(request.cause()),
       _gc_cause_setter(ZDriver::minor(), _gc_cause),
@@ -374,7 +374,7 @@ private:
   ZServiceabilityCycleTracer   _tracer;
 
 public:
-  ZDriverScopeMajor(const ZDriverRequest& request, ConcurrentGCTimer* gc_timer) :
+  ZDriverScopeMajor(const ZDriverRequest& request, MixedGCTimer* gc_timer) :
       _gc_id(),
       _gc_cause(request.cause()),
       _gc_cause_setter(ZDriver::major(), _gc_cause),

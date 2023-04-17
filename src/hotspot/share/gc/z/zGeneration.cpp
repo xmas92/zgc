@@ -318,11 +318,11 @@ void ZGeneration::increase_compacted(size_t size) {
   Atomic::add(&_compacted, size, memory_order_relaxed);
 }
 
-ConcurrentGCTimer* ZGeneration::gc_timer() const {
+MixedGCTimer* ZGeneration::gc_timer() const {
   return _gc_timer;
 }
 
-void ZGeneration::set_gc_timer(ConcurrentGCTimer* gc_timer) {
+void ZGeneration::set_gc_timer(MixedGCTimer* gc_timer) {
   assert(_gc_timer == nullptr, "Incorrect scoping");
   _gc_timer = gc_timer;
 }
@@ -367,7 +367,7 @@ void ZGeneration::set_phase(Phase new_phase) {
   _phase = new_phase;
 }
 
-void ZGeneration::at_collection_start(ConcurrentGCTimer* gc_timer) {
+void ZGeneration::at_collection_start(MixedGCTimer* gc_timer) {
   set_gc_timer(gc_timer);
   stat_cycle()->at_start();
   stat_heap()->at_collection_start(_page_allocator->stats(this));
@@ -494,7 +494,7 @@ private:
   ZStatTimer       _stat_timer;
 
 public:
-  ZGenerationCollectionScopeYoung(ZYoungType type, ConcurrentGCTimer* gc_timer) :
+  ZGenerationCollectionScopeYoung(ZYoungType type, MixedGCTimer* gc_timer) :
       _type_setter(type),
       _stat_timer(ZPhaseGenerationYoung[(int)type], gc_timer) {
     // Update statistics and set the GC timer
@@ -512,7 +512,7 @@ bool ZGenerationYoung::should_record_stats() {
          type() == ZYoungType::major_partial_roots;
 }
 
-void ZGenerationYoung::collect(ZYoungType type, ConcurrentGCTimer* timer) {
+void ZGenerationYoung::collect(ZYoungType type, MixedGCTimer* timer) {
   ZGenerationCollectionScopeYoung scope(type, timer);
 
   // Phase 1: Pause Mark Start
@@ -943,7 +943,7 @@ private:
   ZDriverUnlocker _unlocker;
 
 public:
-  ZGenerationCollectionScopeOld(ConcurrentGCTimer* gc_timer) :
+  ZGenerationCollectionScopeOld(MixedGCTimer* gc_timer) :
       _stat_timer(ZPhaseGenerationOld, gc_timer),
       _unlocker() {
     // Update statistics and set the GC timer
@@ -960,7 +960,7 @@ bool ZGenerationOld::should_record_stats() {
   return true;
 }
 
-void ZGenerationOld::collect(ConcurrentGCTimer* timer) {
+void ZGenerationOld::collect(MixedGCTimer* timer) {
   ZGenerationCollectionScopeOld scope(timer);
 
   // Phase 1: Concurrent Mark

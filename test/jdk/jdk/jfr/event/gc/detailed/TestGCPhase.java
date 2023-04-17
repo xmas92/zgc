@@ -53,9 +53,8 @@ public class TestGCPhase {
 
             // Verify recording
             List<RecordedEvent> events = Events.fromRecording(recording);
-            // No use of EventNames.GCPhase yet
-            // Events.hasEvents(events);
-            // Events.hasEvent(events, EventNames.GCPhase);
+            Events.hasEvents(events);
+            Events.hasEvent(events, EventNames.GCPhase);
 
             // No use of EventNames.GCPhaseLevel1 yet
             // Events.hasEvent(events, EventNames.GCPhaseLevel1);
