@@ -53,6 +53,8 @@ static const ZStatCriticalPhase ZCriticalPhaseRelocationStall("Relocation Stall"
 static const ZStatSubPhase ZSubPhaseConcurrentRelocateRememberedSetFlipPromotedYoung("Concurrent Relocate Remset FP", ZGenerationId::young);
 static const ZStatSubPhase ZSubPhaseConcurrentRelocateTaskYoung("Concurrent Relocate Task", ZGenerationId::young);
 static const ZStatSubPhase ZSubPhaseConcurrentRelocateTaskOld("Concurrent Relocate Task", ZGenerationId::old);
+static const ZStatSubPhase ZSubPhaseConcurrentStoreBufferInstallBasePointersYoung("Concurrent Store Buffer Install Base", ZGenerationId::young);
+static const ZStatSubPhase ZSubPhaseConcurrentStoreBufferInstallBasePointersOld("Concurrent Store Buffer Install Base", ZGenerationId::old);
 
 static uintptr_t forwarding_index(ZForwarding* forwarding, zoffset from_offset) {
   return (from_offset - forwarding->start()) >> forwarding->object_alignment_shift();
@@ -1043,11 +1045,16 @@ public:
 class ZRelocateStoreBufferInstallBasePointersTask : public ZTask {
 private:
   ZJavaThreadsIterator _threads_iter;
+  ZStatTimer           _timer;
 
 public:
   ZRelocateStoreBufferInstallBasePointersTask(ZGeneration* generation) :
-    ZTask("ZRelocateStoreBufferInstallBasePointersTask"),
-    _threads_iter(generation->id_optional()) {}
+      ZTask("ZRelocateStoreBufferInstallBasePointersTask"),
+      _threads_iter(generation->id_optional()),
+      _timer(generation->is_young()
+              ? ZSubPhaseConcurrentStoreBufferInstallBasePointersYoung
+              : ZSubPhaseConcurrentStoreBufferInstallBasePointersOld,
+            generation->gc_timer()) {}
 
   virtual void work() {
     ZRelocateStoreBufferInstallBasePointersThreadClosure fix_store_buffer_cl;
