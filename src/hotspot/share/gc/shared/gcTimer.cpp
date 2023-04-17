@@ -43,7 +43,7 @@ void GCTimer::register_gc_end(const Ticks& time) {
 }
 
 void GCTimer::register_gc_pause_start(const char* name, const Ticks& time) {
-  _time_partitions.report_gc_phase_start_top_level(name, time, GCPhase::PausePhaseType);
+  _time_partitions.report_gc_phase_start_new_type(name, time, GCPhase::PausePhaseType);
 }
 
 void GCTimer::register_gc_pause_end(const Ticks& time) {
@@ -69,10 +69,18 @@ void STWGCTimer::register_gc_end(const Ticks& time) {
 }
 
 void ConcurrentGCTimer::register_gc_concurrent_start(const char* name, const Ticks& time) {
-  _time_partitions.report_gc_phase_start_top_level(name, time, GCPhase::ConcurrentPhaseType);
+  _time_partitions.report_gc_phase_start_new_type(name, time, GCPhase::ConcurrentPhaseType);
 }
 
 void ConcurrentGCTimer::register_gc_concurrent_end(const Ticks& time) {
+  _time_partitions.report_gc_phase_end(time);
+}
+
+void MixedGCTimer::register_gc_mixed_start(const char* name, const Ticks& time) {
+  _time_partitions.report_gc_phase_start_new_type(name, time, GCPhase::MixedPhaseType);
+}
+
+void MixedGCTimer::register_gc_mixed_end(const Ticks& time) {
   _time_partitions.report_gc_phase_end(time);
 }
 
@@ -103,14 +111,22 @@ int PhasesStack::phase_index(int level) const {
   return _phase_indices[level];
 }
 
-GCPhase::PhaseType TimePartitions::current_phase_type() const {
+const GCPhase& TimePartitions::current_phase() const {
   int level = _active_phases.count();
   assert(level > 0, "No active phase");
 
   int index = _active_phases.phase_index(level - 1);
-  GCPhase phase = _phases->at(index);
-  GCPhase::PhaseType type = phase.type();
-  return type;
+  return _phases->at(index);
+}
+
+GCPhase::PhaseType TimePartitions::current_phase_type() const {
+  GCPhase phase = current_phase();
+  return phase.type();
+}
+
+int TimePartitions::current_phase_level() const {
+  GCPhase phase = current_phase();
+  return phase.level();
 }
 
 TimePartitions::TimePartitions() {
@@ -130,10 +146,14 @@ void TimePartitions::clear() {
   _longest_pause = Tickspan();
 }
 
+int TimePartitions::next_phase_level(GCPhase::PhaseType type) const {
+  return has_active_phases() && current_phase_type() == type ?  current_phase_level() + 1 : 0;
+}
+
 void TimePartitions::report_gc_phase_start(const char* name, const Ticks& time, GCPhase::PhaseType type) {
   assert(UseZGC || _phases->length() <= 1000, "Too many recorded phases? (count: %d)", _phases->length());
 
-  int level = _active_phases.count();
+  int level = next_phase_level(type);
 
   GCPhase phase;
   phase.set_type(type);
@@ -146,9 +166,10 @@ void TimePartitions::report_gc_phase_start(const char* name, const Ticks& time, 
   _active_phases.push(index);
 }
 
-void TimePartitions::report_gc_phase_start_top_level(const char* name, const Ticks& time, GCPhase::PhaseType type) {
+void TimePartitions::report_gc_phase_start_new_type(const char* name, const Ticks& time, GCPhase::PhaseType type) {
   int level = _active_phases.count();
-  assert(level == 0, "Must be a top-level phase");
+  assert(level == 0 || current_phase_type() != type, "Must be a top-level phase or changing phase");
+  assert(level == 0 || current_phase_type() == GCPhase::MixedPhaseType, "Must only change from MixedPhaseType");
 
   report_gc_phase_start(name, time, type);
 }
@@ -189,7 +210,7 @@ GCPhase* TimePartitions::phase_at(int index) const {
   return _phases->adr_at(index);
 }
 
-bool TimePartitions::has_active_phases() {
+bool TimePartitions::has_active_phases() const {
   return _active_phases.count() > 0;
 }
 

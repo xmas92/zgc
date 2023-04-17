@@ -427,6 +427,11 @@
       <setting name="threshold">0 ms</setting>
     </event>
 
+    <event name="jdk.GCPhase">
+      <setting name="enabled" control="gc-enabled-high">true</setting>
+      <setting name="threshold">0 ms</setting>
+    </event>
+
     <event name="jdk.GCReferenceStatistics">
       <setting name="enabled" control="gc-enabled-normal">true</setting>
     </event>

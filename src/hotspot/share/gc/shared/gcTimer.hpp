@@ -44,7 +44,8 @@ class GCPhase {
  public:
   enum PhaseType {
     PausePhaseType      = 0,
-    ConcurrentPhaseType = 1
+    ConcurrentPhaseType = 1,
+    MixedPhaseType      = 3,
   };
 
  private:
@@ -105,7 +106,10 @@ class TimePartitions {
   Tickspan _sum_of_pauses;
   Tickspan _longest_pause;
 
+  const GCPhase& current_phase() const;
   GCPhase::PhaseType current_phase_type() const;
+  int current_phase_level() const;
+  int next_phase_level(GCPhase::PhaseType type) const;
 
   void report_gc_phase_start(const char* name, const Ticks& time, GCPhase::PhaseType type);
 
@@ -114,7 +118,7 @@ class TimePartitions {
   ~TimePartitions();
   void clear();
 
-  void report_gc_phase_start_top_level(const char* name, const Ticks& time, GCPhase::PhaseType type);
+  void report_gc_phase_start_new_type(const char* name, const Ticks& time, GCPhase::PhaseType type);
   void report_gc_phase_start_sub_phase(const char* name, const Ticks& time);
   void report_gc_phase_end(const Ticks& time);
 
@@ -124,7 +128,7 @@ class TimePartitions {
   const Tickspan sum_of_pauses() const { return _sum_of_pauses; }
   const Tickspan longest_pause() const { return _longest_pause; }
 
-  bool has_active_phases();
+  bool has_active_phases() const;
 
  private:
   void update_statistics(GCPhase* phase);
@@ -169,6 +173,12 @@ class ConcurrentGCTimer : public GCTimer, public CHeapObj<mtGC> {
  public:
   void register_gc_concurrent_start(const char* name, const Ticks& time = Ticks::now());
   void register_gc_concurrent_end(const Ticks& time = Ticks::now());
+};
+
+class MixedGCTimer : public ConcurrentGCTimer {
+ public:
+  void register_gc_mixed_start(const char* name, const Ticks& time = Ticks::now());
+  void register_gc_mixed_end(const Ticks& time = Ticks::now());
 };
 
 class TimePartitionPhasesIterator {

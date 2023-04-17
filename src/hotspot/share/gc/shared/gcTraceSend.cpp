@@ -327,6 +327,15 @@ class PhaseSender : public PhaseVisitor {
     }
   }
 
+  void visit_mixed(GCPhase* phase) {
+    assert(phase->level() < 1, "There is only one level for MixedPhase");
+
+    switch (phase->level()) {
+      case 0: send_phase<EventGCPhase>(phase); break;
+      default: /* Ignore sending this phase */ break;
+    }
+  }
+
  public:
   template<typename T>
   void send_phase(GCPhase* phase) {
@@ -343,9 +352,11 @@ class PhaseSender : public PhaseVisitor {
   void visit(GCPhase* phase) {
     if (phase->type() == GCPhase::PausePhaseType) {
       visit_pause(phase);
-    } else {
-      assert(phase->type() == GCPhase::ConcurrentPhaseType, "Should be ConcurrentPhaseType");
+    } else if (phase->type() == GCPhase::ConcurrentPhaseType) {
       visit_concurrent(phase);
+    } else {
+      assert(phase->type() == GCPhase::MixedPhaseType, "Should be MixedPhaseType");
+      visit_mixed(phase);
     }
   }
 };
