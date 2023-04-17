@@ -100,6 +100,16 @@ static const ZStatPhasePause      ZPhasePauseRelocateStartOld("Pause Relocate St
 static const ZStatPhaseConcurrent ZPhaseConcurrentRelocatedOld("Concurrent Relocate", ZGenerationId::old);
 static const ZStatPhaseConcurrent ZPhaseConcurrentRemapRootsOld("Concurrent Remap Roots", ZGenerationId::old);
 
+static const ZStatSubPhase ZSubPhaseConcurrentSetupRelocationSetYoung("Concurrent Setup Relocation Set", ZGenerationId::young);
+static const ZStatSubPhase ZSubPhaseConcurrentSetupRelocationSetOld("Concurrent Setup Relocation Set", ZGenerationId::old);
+static const ZStatSubPhase ZSubPhaseConcurrentSelectRelocationSetYoung("Concurrent Select Relocation Set", ZGenerationId::young);
+static const ZStatSubPhase ZSubPhaseConcurrentSelectRelocationSetOld("Concurrent Select Relocation Set", ZGenerationId::old);
+static const ZStatSubPhase ZSubPhaseConcurrentInstallRelocationSetYoung("Concurrent Install Relocation Set", ZGenerationId::young);
+static const ZStatSubPhase ZSubPhaseConcurrentInstallRelocationSetOld("Concurrent Install Relocation Set", ZGenerationId::old);
+static const ZStatSubPhase ZSubPhaseConcurrentFlipAgeRelocationSetYoung("Concurrent Flip Age Relocation Set", ZGenerationId::young);
+static const ZStatSubPhase ZSubPhaseConcurrentForwardingsRelocationSetYoung("Concurrent Forwardings Relocation Set", ZGenerationId::young);
+static const ZStatSubPhase ZSubPhaseConcurrentForwardingsRelocationSetOld("Concurrent Forwardings Relocation Set", ZGenerationId::old);
+
 static const ZStatSubPhase ZSubPhaseConcurrentMarkRootsYoung("Concurrent Mark Roots", ZGenerationId::young);
 static const ZStatSubPhase ZSubPhaseConcurrentMarkFollowYoung("Concurrent Mark Follow", ZGenerationId::young);
 
@@ -177,6 +187,8 @@ void ZGeneration::free_empty_pages(ZRelocationSetSelector* selector, int bulk) {
 
 void ZGeneration::flip_age_pages(const ZRelocationSetSelector* selector) {
   if (is_young()) {
+    ZStatTimerYoung timer(ZSubPhaseConcurrentFlipAgeRelocationSetYoung);
+
     _relocate.flip_age_pages(selector->not_selected_small());
     _relocate.flip_age_pages(selector->not_selected_medium());
     _relocate.flip_age_pages(selector->not_selected_large());
@@ -192,9 +204,13 @@ static double fragmentation_limit(ZGenerationId generation) {
 }
 
 void ZGeneration::select_relocation_set(ZGenerationId generation, bool promote_all) {
+  MixedGCTimer* const gc_timer = ZGeneration::generation(generation)->gc_timer();
+  const bool is_old = generation == ZGenerationId::old;
   // Register relocatable pages with selector
   ZRelocationSetSelector selector(fragmentation_limit(generation));
   {
+    ZStatTimer timer(is_old ? ZSubPhaseConcurrentSetupRelocationSetOld : ZSubPhaseConcurrentSetupRelocationSetYoung, gc_timer);
+
     ZGenerationPagesIterator pt_iter(_page_table, _id, _page_allocator);
     for (ZPage* page; pt_iter.next(&page);) {
       if (!page->is_relocatable()) {
@@ -241,8 +257,12 @@ void ZGeneration::select_relocation_set(ZGenerationId generation, bool promote_a
     free_empty_pages(&selector, 0 /* bulk */);
   }
 
-  // Select relocation set
-  selector.select();
+  {
+    ZStatTimer timer(is_old ? ZSubPhaseConcurrentSelectRelocationSetOld : ZSubPhaseConcurrentSelectRelocationSetYoung, gc_timer);
+
+    // Select relocation set
+    selector.select();
+  }
 
   // Selecting tenuring threshold must be done after select
   // which produces the liveness data, but before install,
@@ -251,16 +271,24 @@ void ZGeneration::select_relocation_set(ZGenerationId generation, bool promote_a
     ZGeneration::young()->select_tenuring_threshold(selector.stats(), promote_all);
   }
 
-  // Install relocation set
-  _relocation_set.install(&selector);
+  {
+    ZStatTimer timer(is_old ? ZSubPhaseConcurrentInstallRelocationSetOld : ZSubPhaseConcurrentInstallRelocationSetYoung, gc_timer);
+
+    // Install relocation set
+    _relocation_set.install(&selector);
+  }
 
   // Flip age young pages that were not selected
   flip_age_pages(&selector);
 
-  // Setup forwarding table
-  ZRelocationSetIterator rs_iter(&_relocation_set);
-  for (ZForwarding* forwarding; rs_iter.next(&forwarding);) {
-    _forwarding_table.insert(forwarding);
+  {
+    ZStatTimer timer(is_old ? ZSubPhaseConcurrentForwardingsRelocationSetOld : ZSubPhaseConcurrentForwardingsRelocationSetYoung, gc_timer);
+
+    // Setup forwarding table
+    ZRelocationSetIterator rs_iter(&_relocation_set);
+    for (ZForwarding* forwarding; rs_iter.next(&forwarding);) {
+      _forwarding_table.insert(forwarding);
+    }
   }
 
   // Update statistics
