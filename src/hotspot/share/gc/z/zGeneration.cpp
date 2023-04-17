@@ -76,6 +76,8 @@ static const ZStatPhaseGeneration ZPhaseGenerationOld("Old Generation", ZGenerat
 static const ZStatSubPhase        ZSubPhaseSafepointSyncYoung("Safepoint Synchronize", ZGenerationId::young);
 static const ZStatSubPhase        ZSubPhaseSafepointSyncOld("Safepoint Synchronize", ZGenerationId::old);
 
+static const ZStatSubPhase        ZSubPhaseVerifyOld("Verify Old", ZGenerationId::old);
+
 static const ZStatPhasePause      ZPhasePauseMarkStartYoung("Pause Mark Start", ZGenerationId::young);
 static const ZStatPhasePause      ZPhasePauseMarkStartYoungAndOld("Pause Mark Start (Major)", ZGenerationId::young);
 static const ZStatPhaseConcurrent ZPhaseConcurrentMarkYoung("Concurrent Mark", ZGenerationId::young);
@@ -1099,7 +1101,13 @@ void ZGenerationOld::concurrent_reset_relocation_set() {
 }
 
 class VM_ZVerifyOld : public VM_Operation {
+private:
+  ZStatTimerOld _timer;
 public:
+  VM_ZVerifyOld() :
+      VM_Operation(),
+      _timer(ZSubPhaseVerifyOld) {}
+
   virtual VMOp_Type type() const {
     return VMOp_ZVerifyOld;
   }
