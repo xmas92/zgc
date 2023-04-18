@@ -812,6 +812,10 @@ ZStatSubPhase::ZStatSubPhase(const char* name, ZGenerationId id) :
     ZStatPhase(id == ZGenerationId::young ? "Young Subphase" : "Old Subphase", name) {}
 
 void ZStatSubPhase::register_start(MixedGCTimer* timer, const Ticks& start) const {
+  if (ZAbort::should_abort()) {
+    return;
+  }
+
   if (timer != nullptr) {
     assert(!Thread::current()->is_Worker_thread(), "Unexpected timer value");
     timer->register_gc_phase_start(name(), start);
