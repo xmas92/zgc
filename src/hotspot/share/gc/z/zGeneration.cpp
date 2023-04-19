@@ -76,6 +76,9 @@ static const ZStatPhaseGeneration ZPhaseGenerationOld("Old Generation", ZGenerat
 static const ZStatSubPhase        ZSubPhaseSafepointSyncYoung("Safepoint Synchronize", ZGenerationId::young);
 static const ZStatSubPhase        ZSubPhaseSafepointSyncOld("Safepoint Synchronize", ZGenerationId::old);
 
+static const ZStatSubPhase        ZSubPhaseSafepointDesyncYoung("Safepoint Desynchronize", ZGenerationId::young);
+static const ZStatSubPhase        ZSubPhaseSafepointDesyncOld("Safepoint Desynchronize", ZGenerationId::old);
+
 static const ZStatSubPhase        ZSubPhaseVerifyOld("Verify Old", ZGenerationId::old);
 
 static const ZStatPhasePause      ZPhasePauseMarkStartYoung("Pause Mark Start", ZGenerationId::young);
@@ -498,21 +501,46 @@ public:
 
 class VM_ZOperationYoung : public VM_ZOperation {
 private:
-  ZStatTimerYoung _timer;
+  Ticks _start;
 public:
   VM_ZOperationYoung() :
       VM_ZOperation(),
-      _timer(ZSubPhaseSafepointSyncYoung) {}
+      _start(Ticks::now()) {
+    ZSubPhaseSafepointSyncYoung.register_start(ZGeneration::young()->gc_timer(), _start);
+  }
+
+  ~VM_ZOperationYoung() {
+    ZSubPhaseSafepointDesyncYoung.register_end(ZGeneration::young()->gc_timer(), _start, Ticks::now());
+  }
+
+  virtual void doit() {
+    ZSubPhaseSafepointSyncYoung.register_end(ZGeneration::young()->gc_timer(), _start, Ticks::now());
+    VM_ZOperation::doit();
+    _start = Ticks::now();
+    ZSubPhaseSafepointDesyncYoung.register_start(ZGeneration::young()->gc_timer(), _start);
+  }
 };
 
 class VM_ZOperationOld : public VM_ZOperation {
 private:
-  ZStatTimerOld _timer;
+  Ticks _start;
 public:
   VM_ZOperationOld() :
       VM_ZOperation(),
-      _timer(ZSubPhaseSafepointSyncOld) {}
-};
+      _start(Ticks::now()) {
+    ZSubPhaseSafepointSyncOld.register_start(ZGeneration::old()->gc_timer(), _start);
+  }
+
+  ~VM_ZOperationOld() {
+    ZSubPhaseSafepointDesyncOld.register_end(ZGeneration::old()->gc_timer(), _start, Ticks::now());
+  }
+
+  virtual void doit() {
+    ZSubPhaseSafepointSyncOld.register_end(ZGeneration::old()->gc_timer(), _start, Ticks::now());
+    VM_ZOperation::doit();
+    _start = Ticks::now();
+    ZSubPhaseSafepointDesyncOld.register_start(ZGeneration::old()->gc_timer(), _start);
+  }};
 
 ZYoungTypeSetter::ZYoungTypeSetter(ZYoungType type) {
   assert(ZGeneration::young()->_active_type == ZYoungType::none, "Invalid type");
