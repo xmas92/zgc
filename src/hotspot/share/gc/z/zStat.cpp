@@ -1058,8 +1058,8 @@ bool ZStat::should_print(LogTargetHandle log) const {
 void ZStat::print(LogTargetHandle log, const ZStatSamplerHistory* history) const {
   // Print
   log.print("=== Garbage Collection Statistics =======================================================================================================================");
-  log.print("                                                             Last 10s              Last 10m              Last 10h                Total");
-  log.print("                                                             Avg / Max             Avg / Max             Avg / Max             Avg / Max");
+  log.print("                                                                   Last 10s              Last 10m              Last 10h                Total");
+  log.print("                                                                   Avg / Max             Avg / Max             Avg / Max             Avg / Max");
 
   for (const ZStatSampler* sampler = ZStatSampler::first(); sampler != nullptr; sampler = sampler->next()) {
     const ZStatSamplerHistory& sampler_history = history[sampler->id()];
