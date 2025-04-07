@@ -164,6 +164,7 @@ class markWord {
     return (mask_bits(value(), lock_mask_in_place) == unlocked_value);
   }
   bool is_marked()   const {
+    precond(LockingMode != LM_LOCKZ);
     return (mask_bits(value(), lock_mask_in_place) == marked_value);
   }
   bool is_forwarded() const {
@@ -264,8 +265,8 @@ class markWord {
   markWord clear_lock_bits() const { return markWord(value() & ~lock_mask_in_place); }
 
   // age operations
-  markWord set_marked()   { return markWord((value() & ~lock_mask_in_place) | marked_value); }
-  markWord set_unmarked() { return markWord((value() & ~lock_mask_in_place) | unlocked_value); }
+  markWord set_marked()   { precond(LockingMode != LM_LOCKZ); return markWord((value() & ~lock_mask_in_place) | marked_value); }
+  markWord set_unmarked() { precond(LockingMode != LM_LOCKZ); return markWord((value() & ~lock_mask_in_place) | unlocked_value); }
 
   uint     age()           const { return (uint) mask_bits(value() >> age_shift, age_mask); }
   markWord set_age(uint v) const {

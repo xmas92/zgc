@@ -56,27 +56,31 @@ oop ZObjArrayAllocator::initialize(HeapWord* mem) const {
 
   // Segmented clearing
 
-  // The array is going to be exposed before it has been completely
-  // cleared, therefore we can't expose the header at the end of this
-  // function. Instead explicitly initialize it according to our needs.
+  if (LockingMode != LM_LOCKZ) {
+    // The array is going to be exposed before it has been completely
+    // cleared, therefore we can't expose the header at the end of this
+    // function. Instead explicitly initialize it according to our needs.
 
-  // Signal to the ZIterator that this is an invisible root, by setting
-  // the mark word to "marked". Reset to prototype() after the clearing.
-  if (UseCompactObjectHeaders) {
-    oopDesc::release_set_mark(mem, _klass->prototype_header().set_marked());
-  } else {
-    arrayOopDesc::set_mark(mem, markWord::prototype().set_marked());
-    arrayOopDesc::release_set_klass(mem, _klass);
+    // Signal to the ZIterator that this is an invisible root, by setting
+    // the mark word to "marked". Reset to prototype() after the clearing.
+    if (UseCompactObjectHeaders) {
+      oopDesc::release_set_mark(mem, _klass->prototype_header().set_marked());
+    } else {
+      arrayOopDesc::set_mark(mem, markWord::prototype().set_marked());
+      arrayOopDesc::release_set_klass(mem, _klass);
+    }
   }
   assert(_length >= 0, "length should be non-negative");
   arrayOopDesc::set_length(mem, _length);
 
-  // Keep the array alive across safepoints through an invisible
-  // root. Invisible roots are not visited by the heap iterator
-  // and the marking logic will not attempt to follow its elements.
-  // Relocation and remembered set code know how to dodge iterating
-  // over such objects.
-  ZThreadLocalData::set_invisible_root(_thread, (zaddress_unsafe*)&mem);
+  if (LockingMode != LM_LOCKZ) {
+    // Keep the array alive across safepoints through an invisible
+    // root. Invisible roots are not visited by the heap iterator
+    // and the marking logic will not attempt to follow its elements.
+    // Relocation and remembered set code know how to dodge iterating
+    // over such objects.
+    ZThreadLocalData::set_invisible_root(_thread, (zaddress_unsafe*)&mem);
+  }
 
   const BasicType element_type = ArrayKlass::cast(_klass)->element_type();
   const size_t base_offset_in_bytes = (size_t)arrayOopDesc::base_offset_in_bytes(element_type);
@@ -128,8 +132,10 @@ oop ZObjArrayAllocator::initialize(HeapWord* mem) const {
       const uintptr_t fill_value = is_reference_type(element_type) ? colored_null : 0;
       ZUtils::fill(start, segment, fill_value);
 
-      // Safepoint
-      yield_for_safepoint();
+      if (LockingMode != LM_LOCKZ) {
+        // Safepoint
+        yield_for_safepoint();
+      }
 
       // Deal with safepoints
       if (is_reference_type(element_type) && !seen_gc_safepoint && gc_safepoint_happened()) {
@@ -152,7 +158,9 @@ oop ZObjArrayAllocator::initialize(HeapWord* mem) const {
 
   mem_zap_end_padding(mem);
 
-  ZThreadLocalData::clear_invisible_root(_thread);
+  if (LockingMode != LM_LOCKZ) {
+    ZThreadLocalData::clear_invisible_root(_thread);
+  }
 
   // Signal to the ZIterator that this is no longer an invisible root
   if (UseCompactObjectHeaders) {

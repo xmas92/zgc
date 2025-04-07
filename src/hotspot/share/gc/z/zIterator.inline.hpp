@@ -41,7 +41,7 @@ inline bool ZIterator::is_invisible_object(oop obj) {
   // invisible objects.
   z_verify_safepoints_are_blocked();
 
-  return obj->mark_acquire().is_marked();
+  return LockingMode != LM_LOCKZ && obj->mark_acquire().is_marked();
 }
 
 inline bool ZIterator::is_invisible_object_array(oop obj) {

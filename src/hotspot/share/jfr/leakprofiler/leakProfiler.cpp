@@ -39,6 +39,9 @@ bool LeakProfiler::is_supported() {
     // with concurrent GC uses of them. This affects Shenandoah.
     return false;
   }
+  if (LockingMode == LM_LOCKZ) {
+    return false;
+  }
   return true;
 }
 
