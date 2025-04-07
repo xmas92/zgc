@@ -1962,8 +1962,9 @@ const int ObjectAlignmentInBytes = 8;
           "(Deprecated) Select locking mode: "                              \
           "0: (Deprecated) monitors only (LM_MONITOR), "                    \
           "1: (Deprecated) monitors & legacy stack-locking (LM_LEGACY), "   \
-          "2: monitors & new lightweight locking (LM_LIGHTWEIGHT, default)") \
-          range(0, 2)                                                       \
+          "2: monitors & new lightweight locking (LM_LIGHTWEIGHT, default) " \
+          "3: LM_LOCKZ")                                                    \
+          range(0, 3)                                                       \
                                                                             \
   product(bool, UseObjectMonitorTable, false, DIAGNOSTIC,                   \
           "With Lightweight Locking mode, use a table to record inflated "  \
