@@ -966,7 +966,7 @@ static intptr_t get_next_hash(Thread* current, oop obj) {
 }
 
 static intptr_t install_hash_code(Thread* current, oop obj) {
-  assert(UseObjectMonitorTable && LockingMode == LM_LIGHTWEIGHT, "must be");
+  assert((UseObjectMonitorTable && LockingMode == LM_LIGHTWEIGHT) || LockingMode == LM_LOCKZ, "must be");
 
   markWord mark = obj->mark_acquire();
   for (;;) {
@@ -987,7 +987,7 @@ static intptr_t install_hash_code(Thread* current, oop obj) {
 }
 
 intptr_t ObjectSynchronizer::FastHashCode(Thread* current, oop obj) {
-  if (UseObjectMonitorTable) {
+  if (UseObjectMonitorTable || LockingMode == LM_LOCKZ) {
     // Since the monitor isn't in the object header, the hash can simply be
     // installed in the object header.
     return install_hash_code(current, obj);

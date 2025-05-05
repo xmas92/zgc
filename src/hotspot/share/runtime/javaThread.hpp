@@ -44,6 +44,7 @@
 #include "runtime/threadHeapSampler.hpp"
 #include "runtime/threadIdentifier.hpp"
 #include "runtime/threadStatisticalInfo.hpp"
+#include "runtime/zSynchronizer.hpp"
 #include "utilities/exceptions.hpp"
 #include "utilities/globalDefinitions.hpp"
 #include "utilities/macros.hpp"
@@ -1263,6 +1264,17 @@ public:
   // This is only for use by JVMTI RawMonitorWait. It emulates the actions of
   // the Java code in Object::wait which are not present in RawMonitorWait.
   bool get_and_clear_interrupted();
+
+private:
+  LockZThreadData _lock_z_thread_data;
+
+public:
+  LockZThreadData& lock_z_thread_data() { return _lock_z_thread_data; }
+  void lockz_clear_and_count_pool();
+
+  static ByteSize lock_z_thread_data_offset(){ return byte_offset_of(JavaThread, _lock_stack); }
+  static ByteSize lock_z_thread_data_pool_offset(){ return lock_z_thread_data_offset() + LockZThreadData::pool_offset(); }
+  static ByteSize lock_z_thread_data_locks_offset(){ return lock_z_thread_data_offset() + LockZThreadData::locks_offset(); }
 
 private:
   LockStack _lock_stack;

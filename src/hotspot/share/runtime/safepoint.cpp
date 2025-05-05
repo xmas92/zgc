@@ -732,6 +732,8 @@ void ThreadSafepointState::account_safe_thread() {
   // from keeping dead objects alive. Because these oops are always cleared
   // before safepoint operations they are not visited in JavaThread::oops_do.
   _thread->om_clear_monitor_cache();
+
+  _thread->lockz_clear_and_count_pool();
 }
 
 void ThreadSafepointState::restart() {

@@ -418,6 +418,9 @@ intptr_t oopDesc::identity_hash() {
   // Fast case; if the object is unlocked and the hash value is set, no locking is needed
   // Note: The mark must be read into local variable to avoid concurrent updates.
   markWord mrk = mark();
+  if (LockingMode == LM_LOCKZ) {
+    return mrk.has_no_hash() ? slow_identity_hash() : mrk.hash();
+  }
   if (mrk.is_unlocked() && !mrk.has_no_hash()) {
     return mrk.hash();
   } else if (mrk.is_marked()) {
@@ -431,8 +434,8 @@ intptr_t oopDesc::identity_hash() {
 // to optimize JVMTI table lookup.
 bool oopDesc::fast_no_hash_check() {
   markWord mrk = mark_acquire();
-  assert(!mrk.is_marked(), "should never be marked");
-  return mrk.is_unlocked() && mrk.has_no_hash();
+  assert(LockingMode == LM_LOCKZ || !mrk.is_marked(), "should never be marked");
+  return (LockingMode == LM_LOCKZ || mrk.is_unlocked()) && mrk.has_no_hash();
 }
 
 bool oopDesc::has_displaced_mark() const {

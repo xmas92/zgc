@@ -251,6 +251,12 @@ inline InstanceKlass* JavaThread::class_being_initialized() const {
   return _class_being_initialized;
 }
 
+inline void JavaThread::lockz_clear_and_count_pool() {
+  if (LockingMode == LM_LOCKZ) {
+    lock_z_thread_data().clear_and_count_pool();
+  }
+}
+
 inline void JavaThread::om_set_monitor_cache(ObjectMonitor* monitor) {
   assert(UseObjectMonitorTable, "must be");
   assert(monitor != nullptr, "use om_clear_monitor_cache to clear");

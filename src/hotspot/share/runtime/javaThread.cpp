@@ -820,6 +820,12 @@ void JavaThread::exit(bool destroy_vm, ExitType exit_type) {
 
   om_clear_monitor_cache();
 
+  if (LockingMode == LM_LOCKZ) {
+    // Need to transfer the _pool to a shared list for reclamation
+    // Also ensure no locks are still left (should only be jni locks)
+    Unimplemented();
+  }
+
   if (log_is_enabled(Debug, os, thread, timer)) {
     _timer_exit_phase1.start();
   }
@@ -1438,6 +1444,10 @@ void JavaThread::oops_do_no_frames(OopClosure* f, NMethodClosure* cf) {
 
   if (LockingMode == LM_LIGHTWEIGHT) {
     lock_stack().oops_do(f);
+  }
+
+  if (LockingMode == LM_LOCKZ) {
+    lock_z_thread_data().oops_do(f);
   }
 }
 

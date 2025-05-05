@@ -147,6 +147,21 @@ class markWord {
   static const uintptr_t monitor_value            = 2;
   static const uintptr_t marked_value             = 3;
 
+  STATIC_ASSERT(lock_bits >= 2);
+  static const uintptr_t z_locked_mask            = right_n_bits(1);
+  static const uintptr_t z_locked_mask_in_place   = z_locked_mask << lock_shift;
+  static const uintptr_t z_parked_mask            = right_n_bits(1);
+  static const uintptr_t z_parked_mask_in_place   = z_parked_mask << (lock_shift + 1);
+
+  static const uintptr_t z_locked_value           = uintptr_t(1) << lock_shift;
+  static const uintptr_t z_parked_value           = uintptr_t(1) << (lock_shift + 1);
+
+  STATIC_ASSERT(self_fwd_bits >= 1);
+  static const uintptr_t z_waiter_mask            = right_n_bits(1);
+  static const uintptr_t z_waiter_mask_in_place   = z_waiter_mask << self_fwd_shift;
+
+  static const uintptr_t z_waiter_value           = uintptr_t(1) << self_fwd_shift;
+
   static const uintptr_t no_hash                  = 0 ;  // no hash value assigned
   static const uintptr_t no_hash_in_place         = (uintptr_t)no_hash << hash_shift;
   static const uintptr_t no_lock_in_place         = unlocked_value;
@@ -158,9 +173,11 @@ class markWord {
 
   // lock accessors (note that these assume lock_shift == 0)
   bool is_locked()   const {
+    precond(LockingMode != LM_LOCKZ);
     return (mask_bits(value(), lock_mask_in_place) != unlocked_value);
   }
   bool is_unlocked() const {
+    precond(LockingMode != LM_LOCKZ);
     return (mask_bits(value(), lock_mask_in_place) == unlocked_value);
   }
   bool is_marked()   const {
@@ -168,16 +185,18 @@ class markWord {
     return (mask_bits(value(), lock_mask_in_place) == marked_value);
   }
   bool is_forwarded() const {
+    precond(LockingMode != LM_LOCKZ);
     // Returns true for normal forwarded (0b011) and self-forwarded (0b1xx).
     return mask_bits(value(), lock_mask_in_place | self_fwd_mask_in_place) >= static_cast<intptr_t>(marked_value);
   }
   bool is_neutral()  const {  // Not locked, or marked - a "clean" neutral state
+    precond(LockingMode != LM_LOCKZ);
     return (mask_bits(value(), lock_mask_in_place) == unlocked_value);
   }
 
   // Special temporary state of the markWord while being inflated.
   // Code that looks at mark outside a lock need to take this into account.
-  bool is_being_inflated() const { return (value() == 0); }
+  bool is_being_inflated() const { precond(LockingMode != LM_LOCKZ); return (value() == 0); }
 
   // Distinguished markword value - used when inflating over
   // an existing stack-lock.  0 indicates the markword is "BUSY".
@@ -186,10 +205,11 @@ class markWord {
   // other thread.  (They should spin or block instead.  The 0 value
   // is transient and *should* be short-lived).
   // Fast-locking does not use INFLATING.
-  static markWord INFLATING() { return zero(); }    // inflate-in-progress
+  static markWord INFLATING() { precond(LockingMode != LM_LOCKZ); return zero(); }    // inflate-in-progress
 
   // Should this header be preserved during GC?
   bool must_be_preserved() const {
+    precond(LockingMode != LM_LOCKZ);
     return (!is_unlocked() || !has_no_hash());
   }
 
@@ -197,36 +217,46 @@ class markWord {
   // synchronization functions. They are not really gc safe.
   // They must get updated if markWord layout get changed.
   markWord set_unlocked() const {
+    precond(LockingMode != LM_LOCKZ);
     return markWord(value() | unlocked_value);
   }
   bool has_locker() const {
+    precond(LockingMode != LM_LOCKZ);
     assert(LockingMode == LM_LEGACY, "should only be called with legacy stack locking");
     return (value() & lock_mask_in_place) == locked_value;
   }
   BasicLock* locker() const {
+    precond(LockingMode != LM_LOCKZ);
     assert(has_locker(), "check");
     return (BasicLock*) value();
   }
 
   bool is_fast_locked() const {
+    precond(LockingMode != LM_LOCKZ);
     assert(LockingMode == LM_LIGHTWEIGHT, "should only be called with new lightweight locking");
     return (value() & lock_mask_in_place) == locked_value;
   }
   markWord set_fast_locked() const {
+    precond(LockingMode != LM_LOCKZ);
     // Clear the lock_mask_in_place bits to set locked_value:
     return markWord(value() & ~lock_mask_in_place);
   }
 
   bool has_monitor() const {
+    precond(LockingMode != LM_LOCKZ);
     return ((value() & lock_mask_in_place) == monitor_value);
   }
   ObjectMonitor* monitor() const {
     assert(has_monitor(), "check");
+    precond(LockingMode != LM_LOCKZ);
     assert(!UseObjectMonitorTable, "Lightweight locking with OM table does not use markWord for monitors");
     // Use xor instead of &~ to provide one extra tag-bit check.
     return (ObjectMonitor*) (value() ^ monitor_value);
   }
   bool has_displaced_mark_helper() const {
+    if (LockingMode == LM_LOCKZ) {
+      return false;
+    }
     intptr_t lockbits = value() & lock_mask_in_place;
     if (LockingMode == LM_LIGHTWEIGHT) {
       return !UseObjectMonitorTable && lockbits == monitor_value;
@@ -249,20 +279,23 @@ class markWord {
   // the following two functions create the markWord to be
   // stored into object header, it encodes monitor info
   static markWord encode(BasicLock* lock) {
+    precond(LockingMode != LM_LOCKZ);
     return from_pointer(lock);
   }
   static markWord encode(ObjectMonitor* monitor) {
+    precond(LockingMode != LM_LOCKZ);
     assert(!UseObjectMonitorTable, "Lightweight locking with OM table does not use markWord for monitors");
     uintptr_t tmp = (uintptr_t) monitor;
     return markWord(tmp | monitor_value);
   }
 
   markWord set_has_monitor() const {
+    precond(LockingMode != LM_LOCKZ);
     return markWord((value() & ~lock_mask_in_place) | monitor_value);
   }
 
   // used to encode pointers during GC
-  markWord clear_lock_bits() const { return markWord(value() & ~lock_mask_in_place); }
+  markWord clear_lock_bits() const { precond(LockingMode != LM_LOCKZ); return markWord(value() & ~lock_mask_in_place); }
 
   // age operations
   markWord set_marked()   { precond(LockingMode != LM_LOCKZ); return markWord((value() & ~lock_mask_in_place) | marked_value); }
@@ -292,6 +325,9 @@ class markWord {
 
   // Prototype mark for initialization
   static markWord prototype() {
+    if (LockingMode == LM_LOCKZ) {
+      return markWord::zero();
+    }
     return markWord( no_hash_in_place | no_lock_in_place );
   }
 
@@ -299,27 +335,31 @@ class markWord {
   void print_on(outputStream* st, bool print_monitor_info = true) const;
 
   // Prepare address of oop for placement into mark
-  inline static markWord encode_pointer_as_mark(void* p) { return from_pointer(p).set_marked(); }
+  inline static markWord encode_pointer_as_mark(void* p) { precond(LockingMode != LM_LOCKZ); return from_pointer(p).set_marked(); }
 
   // Recover address of oop from encoded form used in mark
-  inline void* decode_pointer() const { return (void*)clear_lock_bits().value(); }
+  inline void* decode_pointer() const { precond(LockingMode != LM_LOCKZ); return (void*)clear_lock_bits().value(); }
 
   inline bool is_self_forwarded() const {
+    precond(LockingMode != LM_LOCKZ);
     NOT_LP64(assert(LockingMode != LM_LEGACY, "incorrect with LM_LEGACY on 32 bit");)
     return mask_bits(value(), self_fwd_mask_in_place) != 0;
   }
 
   inline markWord set_self_forwarded() const {
+    precond(LockingMode != LM_LOCKZ);
     NOT_LP64(assert(LockingMode != LM_LEGACY, "incorrect with LM_LEGACY on 32 bit");)
     return markWord(value() | self_fwd_mask_in_place);
   }
 
   inline markWord unset_self_forwarded() const {
+    precond(LockingMode != LM_LOCKZ);
     NOT_LP64(assert(LockingMode != LM_LEGACY, "incorrect with LM_LEGACY on 32 bit");)
     return markWord(value() & ~self_fwd_mask_in_place);
   }
 
   inline oop forwardee() const {
+    precond(LockingMode != LM_LOCKZ);
     return cast_to_oop(decode_pointer());
   }
 };

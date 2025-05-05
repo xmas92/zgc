@@ -28,6 +28,7 @@
 #include "oops/markWord.hpp"
 #include "runtime/atomic.hpp"
 #include "runtime/handles.hpp"
+#include "runtime/zSynchronizer.hpp"
 #include "utilities/globalDefinitions.hpp"
 #include "utilities/sizes.hpp"
 
@@ -50,7 +51,7 @@ class BasicLock {
   static int metadata_offset_in_bytes() { return (int)offset_of(BasicLock, _metadata); }
 
  public:
-  BasicLock() : _metadata(0) {}
+  BasicLock() : _metadata(DEBUG_ONLY(LockingMode == LM_LOCKZ ? LockZBasicLockState::BadValue :) 0) {}
 
   // LM_MONITOR
   void set_bad_metadata_deopt() { set_metadata(badDispHeaderDeopt); }
@@ -65,6 +66,11 @@ class BasicLock {
   inline void clear_object_monitor_cache();
   inline void set_object_monitor_cache(ObjectMonitor* mon);
   static int object_monitor_cache_offset_in_bytes() { return metadata_offset_in_bytes(); }
+
+  // LM_LOCKZ
+  inline LockZBasicLockState lock_z_basic_lock_state() { return {get_metadata()}; };
+  inline void set_lock_z_basic_lock_state(LockZBasicLockState state) { set_metadata(state.raw_data()); }
+  static int lock_z_basic_lock_state_in_bytes() { return metadata_offset_in_bytes(); }
 
   void print_on(outputStream* st, oop owner) const;
 
