@@ -114,13 +114,13 @@ public:
   void set_waiter() {
     assert(!has_waiter(), "must be");
     const uintptr_t or_value = markWord::z_waiter_value;
-    _markword.fetch_or(or_value, std::memory_order_release);
+    _markword.fetch_or(or_value, std::memory_order_relaxed);
   }
 
   void clear_waiter() {
     assert(has_waiter(), "must be");
     const uintptr_t xor_value = markWord::z_waiter_value;
-    _markword.fetch_xor(xor_value, std::memory_order_release);
+    _markword.fetch_xor(xor_value, std::memory_order_relaxed);
   }
 };
 
@@ -299,6 +299,18 @@ public:
     _park_state = LockZParkState::enter;
   }
 
+  void init_wait(oop object, oop vthread) {
+    init_object(object);
+    _parker.init(vthread);
+    _park_state = LockZParkState::wait;
+  }
+
+  void init_wait(oop object, JavaThread* thread) {
+    init_object(object);
+    _parker.init(thread);
+    _park_state = LockZParkState::wait;
+  }
+
   void clear() {
     _handle.replace(nullptr);
     _parker.clear();
@@ -469,6 +481,16 @@ public:
   void init_contended_lock_for_enter(oop object, JavaThread* thread) {
     ensure_contended_lock_constructed();
     _contented_lock->init_enter(object, thread);
+  }
+
+  void init_contended_lock_for_wait(oop vthread) {
+    ensure_contended_lock_constructed();
+    _contented_lock->init_wait(_fast_lock._object, vthread);
+  }
+
+  void init_contended_lock_for_wait(JavaThread* thread) {
+    ensure_contended_lock_constructed();
+    _contented_lock->init_wait(_fast_lock._object, thread);
   }
 
   LockZContendedLock& contented_lock() { return *_contented_lock; }
@@ -915,12 +937,7 @@ LockZHashTable& LockZSynchronizer::get_hash_table() {
   return *_table;
 }
 
-LockZSynchronizer::VerifyEnter::VerifyEnter(oop object, BasicLock* lock, JavaThread* locking_thread)
-  : _object(JavaThread::current(), object),
-    _lock(lock),
-    _locking_thread(locking_thread),
-    _is_vthread(_locking_thread->last_continuation() != nullptr &&
-                _locking_thread->last_continuation()->is_virtual_thread()) {
+void LockZSynchronizer::VerifyEnter::verify_entry(oop object) {
   if (_locking_thread != JavaThread::current()) {
     guarantee(_locking_thread->is_suspendible_thread(), "other thread must be suspended");
   }
@@ -929,31 +946,51 @@ LockZSynchronizer::VerifyEnter::VerifyEnter(oop object, BasicLock* lock, JavaThr
   guarantee(!lock_state.has_node(), "must not have a node");
 
   if (lock_state.is_pre_locked()) {
-    const LockZMarkState mark_state(_object());
+    const LockZMarkState mark_state(object);
     const LockZThreadData& thread_state = _locking_thread->lock_z_thread_data();
 
-    guarantee(!thread_state.locks_contains(_object()), "should not contain lock");
+    guarantee(!thread_state.locks_contains(object), "should not contain lock");
     guarantee(mark_state.is_locked(), "must be locked");
   } else {
     assert(lock_state.is_bad(), "in debug we maintain a bad value invariant");
   }
+}
 
+LockZSynchronizer::VerifyEnter::VerifyEnter(oop object, BasicLock* lock, JavaThread* locking_thread)
+  : VerifyEnter(Handle(), lock, locking_thread) {
+  verify_entry(object);
+}
+
+LockZSynchronizer::VerifyEnter::VerifyEnter(Handle handle, BasicLock* lock, JavaThread* locking_thread)
+  : _handle(handle),
+    _lock(lock),
+    _locking_thread(locking_thread),
+    _is_vthread(_locking_thread->last_continuation() != nullptr &&
+                _locking_thread->last_continuation()->is_virtual_thread()) {
+  if (_handle.not_null()) {
+    verify_entry(_handle());
+  }
 }
 
 LockZSynchronizer::VerifyEnter::~VerifyEnter() {
+  if (_handle.is_null()) {
+    // Empty verifier
+    return;
+  }
+
   const LockZBasicLockState lock_state = _lock->lock_z_basic_lock_state();
-  const LockZMarkState mark_state(_object());
+  const LockZMarkState mark_state(_handle());
   const LockZThreadData& thread_state = _locking_thread->lock_z_thread_data();
 
   const bool is_preempted = _is_vthread /* || TODO[Add exact condition]*/;
 
   if (!is_preempted) {
     guarantee(mark_state.is_locked(), "must be locked");
-    guarantee(thread_state.locks_contains(_object()), "must contain lock");
+    guarantee(thread_state.locks_contains(_handle()), "must contain lock");
     guarantee(lock_state.has_node(), "must have a node");
 
-    guarantee(lock_state.get_node()->fast_lock()._object == _object(), "lock node must be correct");
-    guarantee(thread_state.get_lock_node(_object()) == lock_state.get_node(), "thread node must be correct");
+    guarantee(lock_state.get_node()->fast_lock()._object == _handle(), "lock node must be correct");
+    guarantee(thread_state.get_lock_node(_handle()) == lock_state.get_node(), "thread node must be correct");
   }
 }
 
@@ -994,15 +1031,17 @@ LockZSynchronizer::VerifyExit::~VerifyExit() {
 }
 
 LockZSynchronizer::VerifyNotify::VerifyNotify(oop object, JavaThread* current)
-: _object(current, object),
-  _current(current) {
-}
+  : VerifyNotify(Handle(), current) {}
+
+LockZSynchronizer::VerifyNotify::VerifyNotify(Handle handle, JavaThread* current)
+  : _handle(handle),
+    _current(current) {}
 
 LockZSynchronizer::VerifyNotify::~VerifyNotify() {
 }
 
-LockZSynchronizer::VerifyWait::VerifyWait(oop object, JavaThread* current)
-: _object(current, object),
+LockZSynchronizer::VerifyWait::VerifyWait(Handle handle, JavaThread* current)
+: _handle(handle),
   _current(current) {
 }
 
@@ -1013,7 +1052,6 @@ void LockZSynchronizer::init_hash_table() {
   precond(LockingMode == LM_LOCKZ);
   _table = new LockZHashTable();
 }
-
 
 #if INCLUDE_JFR
 template <typename Event, typename... RemainingEvents>
@@ -1134,17 +1172,52 @@ void LockZSynchronizer::slow_notify(Handle handle, bool notify_all, TRAPS) {
   bucket.unlock();
 }
 
-void LockZSynchronizer::notify(oop& object, TRAPS) {
-  notify_in_scope<false /* notify_all */>(object, [](auto slow){ slow(); }, THREAD);
+void LockZSynchronizer::notify(Handle handle, TRAPS) {
+  notify_in_scope<false /* notify_all */>(handle, [](auto slow){ slow(); }, THREAD);
 }
 
-void LockZSynchronizer::notify_all(oop& object, TRAPS) {
-  notify_in_scope<true /* notify_all */>(object, [](auto slow){ slow(); }, THREAD);
+void LockZSynchronizer::notify_all(Handle handle, TRAPS) {
+  notify_in_scope<true /* notify_all */>(handle, [](auto slow){ slow(); }, THREAD);
 }
 
-void LockZSynchronizer::wait(oop& object, TRAPS) {
-  VerifyWait verify(object, THREAD);
+void LockZSynchronizer::wait(Handle handle, bool interruptible, TRAPS) {
+  VerifyWait verify(handle, THREAD);
 
+  // Throw if not owner
+  check_owner_or_imse(handle, CHECK);
+
+  LockZThreadData& thread_state = current->lock_z_thread_data();
+  LockZNode* const node = thread_state.get_lock_node(handle());
+
+  ContinuationEntry* const continuation_entry = current->last_continuation();
+  const bool is_vthread = continuation_entry != nullptr && continuation_entry->is_virtual_thread();
+
+  if (is_vthread) {
+    node->init_contended_lock_for_wait(THREAD->vthread());
+  } else {
+    node->init_contended_lock_for_wait(THREAD);
+  }
+
+  ensure_jfr_event_buffer_capacity<EventJavaMonitorWait, EventVirtualThreadPinned>(current);
+  EventJavaMonitorWait wait_event;
+  EventVirtualThreadPinned vthread_pinned_event;
+
+  LockZHashTable::LockZHashBucket& bucket = table.get_bucket_locked<true>(key);
+  LockZMarkState mark_state(handle());
+  bucket.link_one(node);
+  if (!mark_state.has_waiter()) {
+    mark_state.set_waiter();
+  }
+
+
+}
+
+void LockZSynchronizer::wait(Handle handle, TRAPS) {
+  wait(handle, true, THREAD);
+}
+
+void LockZSynchronizer::wait_uninterruptible(Handle handle, TRAPS) {
+  wait(handle, false, THREAD);
 }
 
 bool LockZSynchronizer::fast_enter(oop object, BasicLock* lock, JavaThread* locking_thread) {
@@ -1193,6 +1266,7 @@ bool LockZSynchronizer::fast_enter(oop object, BasicLock* lock, JavaThread* lock
 }
 
 void LockZSynchronizer::slow_enter(Handle handle, BasicLock* lock, JavaThread* current) {
+  // TODO: Use fast_lock as handle instead of handle
   assert(current == JavaThread::current(), "should never slow lock another thread");
 
   const LockZBasicLockState lock_state = lock->lock_z_basic_lock_state();
@@ -1224,7 +1298,6 @@ void LockZSynchronizer::slow_enter(Handle handle, BasicLock* lock, JavaThread* c
     }
 
     guarantee(is_vthread, "we should only have a freeze_result if we are a vthread");
-
   };
 
   for (;;) {
@@ -1365,8 +1438,8 @@ void LockZSynchronizer::slow_enter(Handle handle, BasicLock* lock, JavaThread* c
   }
 }
 
-void LockZSynchronizer::enter(oop& object, BasicLock* lock, JavaThread* locking_thread) {
-  enter_in_scope(object, lock, locking_thread, [](auto slow) { slow(); });
+void LockZSynchronizer::enter(Handle handle, BasicLock* lock, JavaThread* locking_thread, JavaThread* current) {
+  enter_in_scope(handle, lock, locking_thread, current, [](auto slow) { slow(); });
 }
 
 bool LockZSynchronizer::fast_exit(oop object, BasicLock* lock, JavaThread* current) {

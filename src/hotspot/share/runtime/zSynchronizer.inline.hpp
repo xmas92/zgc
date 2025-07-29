@@ -30,39 +30,58 @@
 #include "runtime/handles.inline.hpp"
 #include "runtime/javaThread.inline.hpp"
 #include "runtime/safepointVerifiers.hpp"
+#include "utilities/macros.hpp"
 
-template <bool notify_all, typename Scope>
-inline void LockZSynchronizer::notify_in_scope(oop& object, Scope&& scope, TRAPS) {
+inline Handle LockZSynchronizer::handle_helper(oop& object, Thread* current) {
+  Handle object_handle(current, object);
+  CHECK_UNHANDLED_OOPS_ONLY(object = nullptr;)
+  return object_handle;
+}
+
+inline Handle LockZSynchronizer::handle_helper(Handle handle, Thread*) {
+  return handle;
+}
+
+inline oop LockZSynchronizer::handle_helper(oop& object) {
+  return object;
+}
+
+inline oop LockZSynchronizer::handle_helper(Handle handle) {
+  return handle();
+}
+
+template <bool notify_all, typename oopOrHandle, typename Scope>
+inline void LockZSynchronizer::notify_in_scope(oopOrHandle& object, Scope&& scope, TRAPS) {
   NoSafepointVerifier no_safepoint_verifier;
-  VerifyNotify verify(object, THREAD);
-  if (fast_notify(object, THREAD)) {
+  DEBUG_ONLY(VerifyNotify verify(object, THREAD);)
+  if (fast_notify(handle_helper(object), THREAD)) {
     return;
   }
 
   PauseNoSafepointVerifier pause(&no_safepoint_verifier);
 
   const auto slow = [&]() {
-    Handle object_handle(THREAD, object);
-    CHECK_UNHANDLED_OOPS_ONLY(object = nullptr;)
+    Handle object_handle = handle_helper(object, THREAD);
+    VerifyNotify verify(object_handle, THREAD);
     slow_notify(object_handle, notify_all, THREAD);
   };
 
   scope(slow);
 }
 
-template <typename Scope>
-inline void LockZSynchronizer::enter_in_scope(oop& object, BasicLock* lock, JavaThread* locking_thread, Scope&& scope) {
+template <typename oopOrHandle, typename Scope>
+inline void LockZSynchronizer::enter_in_scope(oopOrHandle& object, BasicLock* lock, JavaThread* locking_thread, JavaThread* current, Scope&& scope) {
   NoSafepointVerifier no_safepoint_verifier;
-  VerifyEnter verify(object, lock, locking_thread);
-  if (fast_enter(object, lock, locking_thread)) {
+  DEBUG_ONLY(VerifyEnter verify(object, lock, locking_thread);)
+  if (fast_enter(handle_helper(object), lock, locking_thread)) {
     return;
   }
 
   PauseNoSafepointVerifier pause(&no_safepoint_verifier);
 
   const auto slow = [&]() {
-    Handle object_handle(locking_thread, object);
-    CHECK_UNHANDLED_OOPS_ONLY(object = nullptr;)
+    Handle object_handle = handle_helper(object, current);
+    VerifyEnter verify(object_handle, lock, locking_thread);
     slow_enter(object_handle, lock, locking_thread);
   };
 
@@ -70,7 +89,7 @@ inline void LockZSynchronizer::enter_in_scope(oop& object, BasicLock* lock, Java
 }
 
 template <typename Scope>
-inline void LockZSynchronizer::exit_in_scope(oop& object, BasicLock* lock, JavaThread* current, Scope&& scope) {
+inline void LockZSynchronizer::exit_in_scope(oop object, BasicLock* lock, JavaThread* current, Scope&& scope) {
   NoSafepointVerifier no_safepoint_verifier;
   VerifyExit verify(object, lock, current);
   if (fast_exit(object, lock, current)) {

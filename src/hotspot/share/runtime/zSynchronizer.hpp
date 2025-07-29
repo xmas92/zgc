@@ -187,13 +187,16 @@ private:
 
   class VerifyEnter : StackObj {
   private:
-    const Handle      _object;
+    const Handle      _handle;
     BasicLock* const  _lock;
     JavaThread* const _locking_thread;
     const bool        _is_vthread;
 
+    void verify_entry(oop object);
+
   public:
     VerifyEnter(oop object, BasicLock* lock, JavaThread* locking_thread);
+    VerifyEnter(Handle handle, BasicLock* lock, JavaThread* locking_thread);
     ~VerifyEnter();
   };
 
@@ -211,21 +214,22 @@ private:
 
   class VerifyNotify : StackObj {
   private:
-    const Handle      _object;
+    const Handle      _handle;
     JavaThread* const _current;
 
   public:
     VerifyNotify(oop object, JavaThread* current);
+    VerifyNotify(Handle handle, JavaThread* current);
     ~VerifyNotify();
   };
 
   class VerifyWait : StackObj {
   private:
-    const Handle      _object;
+    const Handle      _handle;
     JavaThread* const _current;
 
   public:
-    VerifyWait(oop object, JavaThread* current);
+    VerifyWait(Handle handle, JavaThread* current);
     ~VerifyWait();
   };
 
@@ -247,27 +251,40 @@ private:
   static bool fast_exit(oop object, BasicLock* lock, JavaThread* current);
   static void slow_exit(oop object, JavaThread* current);
 
+  static Handle handle_helper(oop& object, Thread* current);
+  static Handle handle_helper(Handle handle, Thread* current);
+  static oop handle_helper(oop& object);
+  static oop handle_helper(Handle handle);
+
+  static void wait(Handle handle, bool interruptible, TRAPS);
 public:
   static void init_hash_table();
 
-  template <bool notify_all, typename Scope>
-  static void notify_in_scope(oop& object, Scope&& scope, TRAPS);
-  static void notify(oop& object, TRAPS);
-  static void notify_all(oop& object, TRAPS);
+  template <bool notify_all, typename oopOrHandle, typename Scope>
+  static void notify_in_scope(oopOrHandle& object, Scope&& scope, TRAPS);
+  static void notify(Handle handle, TRAPS);
+  static void notify_all(Handle handle, TRAPS);
 
-  static void wait(oop& object, TRAPS);
+  static void wait_uninterruptible(Handle handle, TRAPS);
+  static void wait(Handle handle, TRAPS);
 
   // enter
-  template <typename Scope>
-  static void enter_in_scope(oop& object, BasicLock* lock, JavaThread* locking_thread, Scope&& scope);
-  static void enter(oop& object, BasicLock* lock, JavaThread* locking_thread);
-  static void jni_enter(oop& object, JavaThread* current);
+  template <typename oopOrHandle, typename Scope>
+  static void enter_in_scope(oopOrHandle& object, BasicLock* lock, JavaThread* locking_thread, JavaThread* current, Scope&& scope);
+  static void enter(Handle handle, BasicLock* lock, JavaThread* locking_thread, JavaThread* current);
+  static void jni_enter(Handle handle, JavaThread* current);
 
   // exit
   template <typename Scope>
-  static void exit_in_scope(oop& object, BasicLock* lock, JavaThread* current, Scope&& scope);
+  static void exit_in_scope(oop object, BasicLock* lock, JavaThread* current, Scope&& scope);
   static void exit(oop object, BasicLock* lock, JavaThread* current);
   static void jni_exit(oop object, JavaThread* current);
+
+public:
+  LockZSynchronizer(const LockZSynchronizer &) = delete;
+  LockZSynchronizer(LockZSynchronizer &&) = delete;
+  LockZSynchronizer &operator=(const LockZSynchronizer &) = default;
+  LockZSynchronizer &operator=(LockZSynchronizer &&) = default;
 };
 
 #endif // SHARE_RUNTIME_ZSYNCHRONIZER_HPP
