@@ -158,6 +158,7 @@ public:
 
   LockZNode* park_state() const;
   void lock_park_state();
+  void set_wait_node(LockZNode* node);
 
   LockZNode* alloc_park_state(oop object);
   LockZNode* alloc_and_lock_node(oop object);
@@ -233,11 +234,16 @@ private:
     ~VerifyWait();
   };
 
+  template <typename Bucket, typename Callback>
+  static void unlink_one_locked(oop object, intptr_t key, Bucket& bucket, Callback&& callback);
+
   template <typename Decider, typename Callback>
   static bool unlink_one_if(oop object, Decider&& decide, Callback&& callback);
 
   template <typename Callback>
   static void unlink_one(oop object, Callback&& callback);
+
+  static void park_and_unlink_on_suspend(Handle handle, jlong millis, LockZNode* node, JavaThread* current);
 
   static bool check_owner(oop object, JavaThread* current);
   static void check_owner_or_imse(Handle handle, TRAPS);
@@ -246,7 +252,8 @@ private:
   static void slow_notify(Handle handle, bool notify_all, TRAPS);
 
   static bool fast_enter(oop object, BasicLock* lock, JavaThread* locking_thread);
-  static void slow_enter(Handle handle, BasicLock* lock, JavaThread* current);
+  template <bool is_wait_reenter>
+  static void slow_enter(Handle handle, JavaThread* current);
 
   static bool fast_exit(oop object, BasicLock* lock, JavaThread* current);
   static void slow_exit(oop object, JavaThread* current);
@@ -256,7 +263,7 @@ private:
   static oop handle_helper(oop& object);
   static oop handle_helper(Handle handle);
 
-  static void wait(Handle handle, bool interruptible, TRAPS);
+  static void wait(Handle handle, jlong millis, bool interruptible, TRAPS);
 public:
   static void init_hash_table();
 
@@ -265,8 +272,8 @@ public:
   static void notify(Handle handle, TRAPS);
   static void notify_all(Handle handle, TRAPS);
 
-  static void wait_uninterruptible(Handle handle, TRAPS);
-  static void wait(Handle handle, TRAPS);
+  static void wait_uninterruptible(Handle handle, jlong millis, TRAPS);
+  static void wait(Handle handle, jlong millis, TRAPS);
 
   // enter
   template <typename oopOrHandle, typename Scope>

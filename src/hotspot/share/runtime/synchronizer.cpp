@@ -514,6 +514,10 @@ void ObjectSynchronizer::enter_for(Handle obj, BasicLock* lock, JavaThread* lock
   // deoptimizing and re-locking locks. See Deoptimization::relock_objects
   assert(locking_thread == Thread::current() || locking_thread->is_obj_deopt_suspend(), "must be");
 
+  if (LockingMode == LM_LOCKZ) {
+    return LockZSynchronizer::enter(obj, lock, locking_thread, JavaThread::current());
+  }
+
   if (LockingMode == LM_LIGHTWEIGHT) {
     return LightweightSynchronizer::enter_for(obj, lock, locking_thread);
   }
@@ -738,6 +742,11 @@ int ObjectSynchronizer::wait(Handle obj, jlong millis, TRAPS) {
   JavaThread* current = THREAD;
   if (millis < 0) {
     THROW_MSG_0(vmSymbols::java_lang_IllegalArgumentException(), "timeout value is negative");
+  }
+
+  if (LockingMode == LM_LOCKZ) {
+    LockZSynchronizer::wait(obj, millis, THREAD);
+    return 0;
   }
 
   ObjectMonitor* monitor;

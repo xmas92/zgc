@@ -76,6 +76,7 @@
 #include "runtime/vframe.inline.hpp"
 #include "runtime/vframeArray.hpp"
 #include "runtime/vm_version.hpp"
+#include "runtime/zSynchronizer.inline.hpp"
 #include "utilities/copy.hpp"
 #include "utilities/dtrace.hpp"
 #include "utilities/events.hpp"
@@ -1939,22 +1940,32 @@ JRT_LEAF(void, SharedRuntime::reguard_yellow_pages())
 JRT_END
 
 void SharedRuntime::monitor_enter_helper(oopDesc* obj, BasicLock* lock, JavaThread* current) {
-  if (!SafepointSynchronize::is_synchronizing()) {
-    // Only try quick_enter() if we're not trying to reach a safepoint
-    // so that the calling thread reaches the safepoint more quickly.
-    if (ObjectSynchronizer::quick_enter(obj, lock, current)) {
-      return;
+  if (LockingMode == LM_LOCKZ) {
+    oop object = obj;
+    LockZSynchronizer::enter_in_scope(object, lock, current, current, [&](auto slow) {
+      JRT_BLOCK_NO_ASYNC
+      slow();
+      assert(!HAS_PENDING_EXCEPTION, "Should have no exception here");
+      JRT_BLOCK_END
+    });
+  } else {
+    if (!SafepointSynchronize::is_synchronizing()) {
+      // Only try quick_enter() if we're not trying to reach a safepoint
+      // so that the calling thread reaches the safepoint more quickly.
+      if (ObjectSynchronizer::quick_enter(obj, lock, current)) {
+        return;
+      }
     }
+    // NO_ASYNC required because an async exception on the state transition destructor
+    // would leave you with the lock held and it would never be released.
+    // The normal monitorenter NullPointerException is thrown without acquiring a lock
+    // and the model is that an exception implies the method failed.
+    JRT_BLOCK_NO_ASYNC
+    Handle h_obj(THREAD, obj);
+    ObjectSynchronizer::enter(h_obj, lock, current);
+    assert(!HAS_PENDING_EXCEPTION, "Should have no exception here");
+    JRT_BLOCK_END
   }
-  // NO_ASYNC required because an async exception on the state transition destructor
-  // would leave you with the lock held and it would never be released.
-  // The normal monitorenter NullPointerException is thrown without acquiring a lock
-  // and the model is that an exception implies the method failed.
-  JRT_BLOCK_NO_ASYNC
-  Handle h_obj(THREAD, obj);
-  ObjectSynchronizer::enter(h_obj, lock, current);
-  assert(!HAS_PENDING_EXCEPTION, "Should have no exception here");
-  JRT_BLOCK_END
 }
 
 // Handles the uncommon case in locking, i.e., contention or an inflated lock.

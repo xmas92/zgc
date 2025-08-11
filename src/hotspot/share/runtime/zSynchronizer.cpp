@@ -246,10 +246,14 @@ public:
     return _thread->_ParkEvent;
   }
 
-  void park() const {
+  void park(jlong millis) const {
     precond(!_is_virtual);
     precond(_thread->thread_state() == _thread_blocked);
-    _thread->_ParkEvent->park();
+    if (millis == 0) {
+      _thread->_ParkEvent->park();
+    } else {
+      _thread->_ParkEvent->park_nanos(millis_to_nanos(millis));
+    }
   }
 
   void reset() const {
@@ -303,12 +307,17 @@ public:
     init_object(object);
     _parker.init(vthread);
     _park_state = LockZParkState::wait;
+    // TODO: Not sure how vthread interputs work _parker.reset();
   }
 
   void init_wait(oop object, JavaThread* thread) {
     init_object(object);
     _parker.init(thread);
     _park_state = LockZParkState::wait;
+    _parker.reset();
+    // Is this fence needed?. How do we synch with the read of the thread
+    // interrupt otherwise. But we do have a bucket lock and unlock in between.
+    OrderAccess::fence();
   }
 
   void clear() {
@@ -809,6 +818,14 @@ void LockZThreadData::lock_park_state() {
   precond(_park_state != nullptr);
   LockZNode* const node = std::exchange(_park_state, nullptr);
   node->double_link_head(_locks);
+  postcond(locks_contains(node));
+}
+
+void LockZThreadData::set_wait_node(LockZNode* node) {
+  precond(_park_state == nullptr);
+  precond(node->contented_lock().park_state() == LockZParkState::wait);
+  unlink_lock_node(node);
+  _park_state = node;
 }
 
 LockZNode* LockZThreadData::alloc_park_state(oop object) {
@@ -1180,44 +1197,120 @@ void LockZSynchronizer::notify_all(Handle handle, TRAPS) {
   notify_in_scope<true /* notify_all */>(handle, [](auto slow){ slow(); }, THREAD);
 }
 
-void LockZSynchronizer::wait(Handle handle, bool interruptible, TRAPS) {
+void LockZSynchronizer::wait(Handle handle, jlong millis, bool interruptible, TRAPS) {
   VerifyWait verify(handle, THREAD);
 
   // Throw if not owner
   check_owner_or_imse(handle, CHECK);
 
-  LockZThreadData& thread_state = current->lock_z_thread_data();
+    // check for a pending interrupt
+  if (interruptible && THREAD->is_interrupted(true) && !HAS_PENDING_EXCEPTION) {
+    THROW(vmSymbols::java_lang_InterruptedException());
+    return;
+  }
+
+  LockZThreadData& thread_state = THREAD->lock_z_thread_data();
   LockZNode* const node = thread_state.get_lock_node(handle());
 
-  ContinuationEntry* const continuation_entry = current->last_continuation();
+  OptLockZ<freeze_result, false /* thread local */> result;
+  ContinuationEntry* const continuation_entry = THREAD->last_continuation();
   const bool is_vthread = continuation_entry != nullptr && continuation_entry->is_virtual_thread();
 
+  // Create the waiter
   if (is_vthread) {
     node->init_contended_lock_for_wait(THREAD->vthread());
   } else {
     node->init_contended_lock_for_wait(THREAD);
   }
 
-  ensure_jfr_event_buffer_capacity<EventJavaMonitorWait, EventVirtualThreadPinned>(current);
-  EventJavaMonitorWait wait_event;
-  EventVirtualThreadPinned vthread_pinned_event;
+  // ensure_jfr_event_buffer_capacity<EventJavaMonitorWait, EventVirtualThreadPinned>(THREAD);
+  // EventJavaMonitorWait wait_event;
+  // EventVirtualThreadPinned vthread_pinned_event;
 
-  LockZHashTable::LockZHashBucket& bucket = table.get_bucket_locked<true>(key);
-  LockZMarkState mark_state(handle());
-  bucket.link_one(node);
-  if (!mark_state.has_waiter()) {
-    mark_state.set_waiter();
+  const intptr_t key = handle->identity_hash();
+  LockZHashTable& table = get_hash_table();
+
+  { // Add waiter and unlock
+    LockZHashTable::LockZHashBucket& bucket = table.get_bucket_locked<true>(key);
+    LockZMarkState mark_state(handle());
+    bucket.link_one(node);
+    if (!mark_state.has_waiter()) {
+      mark_state.set_waiter();
+    }
+
+    thread_state.set_wait_node(node);
+
+    unlink_one_locked(handle(), key, bucket, [&](const auto &unlink_result) {
+      LockZMarkState mark_state(handle());
+      mark_state.unlock_with_parker(unlink_result._has_more);
+    });
   }
 
+  if (is_vthread) {
+    result.create(Continuation::try_preempt(THREAD, continuation_entry->cont_oop(THREAD)));
+    if (*result == freeze_result::freeze_ok) {
+      Unimplemented();
+      return;
+    }
+  }
 
+  if (!interruptible || !THREAD->is_interrupted(false)) {
+    // Park if we have not been interrupted.
+    park_and_unlink_on_suspend(handle, millis, node, THREAD);
+  }
+
+  bool was_notified = true;
+
+  LockZHashTable::LockZHashBucket& bucket = table.get_bucket_locked<true>(key);
+
+  bool has_more = false;
+  oop object = handle();
+  auto unlink_result = bucket.unlink_one([&](const LockZContendedLock &lock) {
+    if (lock.key() != key && lock.object() != object) {
+      // Different keys and object
+      return false;
+    }
+
+    if (&lock == &node->contented_lock()) {
+      // Found our node
+      was_notified = lock.park_state() == LockZParkState::notified;
+      return true;
+    }
+
+    // Are there more waiters?
+    has_more |= lock.park_state() == LockZParkState::wait;
+
+    return false;
+  });
+
+  if (!was_notified && !has_more) {
+    // This node was the last waiter and we removed ourself.
+    LockZMarkState mark_state(object);
+    mark_state.clear_waiter();
+  }
+
+  // Must only have found our own node
+  postcond(unlink_result._unlinked_node == node || unlink_result._unlinked_node == nullptr);
+  postcond(!unlink_result._has_more);
+
+  // Unlock the bucket.
+  bucket.unlock();
+
+  // We are now unlocked and not on the wait list, perform an enter
+  slow_enter<true>(handle, THREAD);
+
+  // Throw interrupt exception incase we were interrupted and not notified.
+  if (!was_notified && interruptible && THREAD->is_interrupted(true) && !HAS_PENDING_EXCEPTION) {
+    THROW(vmSymbols::java_lang_InterruptedException());
+  }
 }
 
-void LockZSynchronizer::wait(Handle handle, TRAPS) {
-  wait(handle, true, THREAD);
+void LockZSynchronizer::wait(Handle handle, jlong millis, TRAPS) {
+  wait(handle, millis, true, THREAD);
 }
 
-void LockZSynchronizer::wait_uninterruptible(Handle handle, TRAPS) {
-  wait(handle, false, THREAD);
+void LockZSynchronizer::wait_uninterruptible(Handle handle, jlong millis, TRAPS) {
+  wait(handle, millis, false, THREAD);
 }
 
 bool LockZSynchronizer::fast_enter(oop object, BasicLock* lock, JavaThread* locking_thread) {
@@ -1265,19 +1358,21 @@ bool LockZSynchronizer::fast_enter(oop object, BasicLock* lock, JavaThread* lock
   return false;
 }
 
-void LockZSynchronizer::slow_enter(Handle handle, BasicLock* lock, JavaThread* current) {
+template <bool is_wait_reenter>
+void LockZSynchronizer::slow_enter(Handle handle, JavaThread* current) {
   // TODO: Use fast_lock as handle instead of handle
   assert(current == JavaThread::current(), "should never slow lock another thread");
 
-  const LockZBasicLockState lock_state = lock->lock_z_basic_lock_state();
   LockZThreadData& thread_state = current->lock_z_thread_data();
-  LockZNode* const node = thread_state.alloc_park_state(handle());
+  LockZNode* const node = is_wait_reenter ? thread_state.park_state() : thread_state.alloc_park_state(handle());
 
   assert(!thread_state.locks_contains(handle()), "should have called fast_enter");
 
-  ensure_jfr_event_buffer_capacity<EventJavaMonitorEnter, EventVirtualThreadPinned>(current);
-  EventJavaMonitorEnter enter_event;
-  EventVirtualThreadPinned vthread_pinned_event;
+  // TODO[Axel]: Fix Events
+  // ensure_jfr_event_buffer_capacity<EventJavaMonitorEnter, EventVirtualThreadPinned>(current);
+  // EventJavaMonitorEnter enter_event;
+  // EventJavaMonitorWait wait_event;
+  // EventVirtualThreadPinned vthread_pinned_event;
 
   OptLockZ<freeze_result, false /* thread local */> result;
   ContinuationEntry* const continuation_entry = current->last_continuation();
@@ -1298,6 +1393,9 @@ void LockZSynchronizer::slow_enter(Handle handle, BasicLock* lock, JavaThread* c
     }
 
     guarantee(is_vthread, "we should only have a freeze_result if we are a vthread");
+    // TODO[Axel]: We have fast locked after having frozen our frames and thread
+    //             state. So we must create a signal to know that the node that
+    ///            was frozen, can be thread_state.lock_park_state(); once thawed.
   };
 
   for (;;) {
@@ -1354,7 +1452,7 @@ void LockZSynchronizer::slow_enter(Handle handle, BasicLock* lock, JavaThread* c
 
     if (is_vthread && !result) {
       // Before parking we must freeze our frames
-      result.create( Continuation::try_preempt(current, continuation_entry->cont_oop(current)));
+      result.create(Continuation::try_preempt(current, continuation_entry->cont_oop(current)));
     }
 
     const intptr_t key = node->contented_lock().key();
@@ -1394,6 +1492,9 @@ void LockZSynchronizer::slow_enter(Handle handle, BasicLock* lock, JavaThread* c
         // We are on the enter queue, fallout to preempted stub.
         return;
       }
+
+      // The loop above is terminal.
+      ShouldNotReachHere();
     }
 
     if (!contended_lock_initalized) {
@@ -1415,25 +1516,7 @@ void LockZSynchronizer::slow_enter(Handle handle, BasicLock* lock, JavaThread* c
     bucket.link_one(node);
     bucket.unlock();
 
-    {
-      const auto on_suspend = [&](JavaThread *current) {
-        // If we are suspended here, we must ensure that another thread wakes up
-        LockZMarkState mark_state(handle());
-        unlink_one_if(
-            handle(),
-            [&]() {
-              // Only try and unlink
-              return mark_state.has_parker();
-            },
-            [&](const auto &unlink_result) {
-              if (!unlink_result._has_more) {
-                mark_state.clear_parker();
-              }
-            });
-      };
-      ThreadBlockInVMPreprocess<decltype(on_suspend)> tbivm(current, on_suspend, true);
-      node->contented_lock().parker().park();
-    }
+    park_and_unlink_on_suspend(handle, 0, node, current);
     // We have been unlinked, try locking again
   }
 }
@@ -1475,22 +1558,10 @@ bool LockZSynchronizer::fast_exit(oop object, BasicLock* lock, JavaThread* curre
   return mark_state.unlock_if_no_parker();
 }
 
-template <typename Decider, typename Callback>
-bool LockZSynchronizer::unlink_one_if(oop object, Decider&& decide, Callback&& callback) {
-  LockZHashTable& table = get_hash_table();
 
-  const intptr_t key = object->identity_hash();
-  auto& bucket = table.get_bucket_locked<false>(key);
-
-  if (!decide()) {
-    // Decided not to unlink
-
-    // Unlock bucket and return
-    bucket.unlock();
-    return false;
-  }
-
-  auto unlink_result = bucket.unlink_one([&](const LockZContendedLock &lock) {
+template <typename Bucket, typename Callback>
+void LockZSynchronizer::unlink_one_locked(oop object, intptr_t key, Bucket& bucket, Callback&& callback) {
+auto unlink_result = bucket.unlink_one([&](const LockZContendedLock &lock) {
     if (lock.key() != key) {
       // Different keys
       return false;
@@ -1532,6 +1603,24 @@ bool LockZSynchronizer::unlink_one_if(oop object, Decider&& decide, Callback&& c
     // Unlock the bucket
     bucket.unlock();
   }
+}
+
+template <typename Decider, typename Callback>
+bool LockZSynchronizer::unlink_one_if(oop object, Decider&& decide, Callback&& callback) {
+  LockZHashTable& table = get_hash_table();
+
+  const intptr_t key = object->identity_hash();
+  auto& bucket = table.get_bucket_locked<false>(key);
+
+  if (!decide()) {
+    // Decided not to unlink
+
+    // Unlock bucket and return
+    bucket.unlock();
+    return false;
+  }
+
+  unlink_one_locked(object, key, bucket, callback);
 
   return true;
 }
@@ -1540,6 +1629,26 @@ template <typename Callback>
 void LockZSynchronizer::unlink_one(oop object, Callback&& callback) {
   // Always decide to unlink
   unlink_one_if(object, []() { return true; }, callback);
+}
+
+void LockZSynchronizer::park_and_unlink_on_suspend(Handle handle, jlong millis, LockZNode* node, JavaThread* current) {
+    const auto on_suspend = [&](JavaThread *current) {
+      // If we are suspended here, we must ensure that another thread wakes up
+      LockZMarkState mark_state(handle());
+      unlink_one_if(
+          handle(),
+          [&]() {
+            // Only try and unlink
+            return mark_state.has_parker();
+          },
+          [&](const auto &unlink_result) {
+            if (!unlink_result._has_more) {
+              mark_state.clear_parker();
+            }
+          });
+    };
+    ThreadBlockInVMPreprocess<decltype(on_suspend)> tbivm(current, on_suspend, true);
+    node->contented_lock().parker().park(millis);
 }
 
 void LockZSynchronizer::slow_exit(oop object, JavaThread* current) {
@@ -1558,14 +1667,14 @@ void LockZSynchronizer::exit(oop object, BasicLock* lock, JavaThread* current) {
   exit_in_scope(object, lock, current, [](auto slow) { slow(); });
 }
 
-void LockZSynchronizer::jni_enter(oop& object, JavaThread* current) {
+void LockZSynchronizer::jni_enter(Handle handle, JavaThread* current) {
   // Find lock node if it exists
   LockZThreadData& thread_state = current->lock_z_thread_data();
-  LockZNode* const node = thread_state.get_lock_node(object);
+  LockZNode* const node = thread_state.get_lock_node(handle());
 
   // Lock on object
   BasicLock lock;
-  enter(object, &lock, current);
+  enter(handle, &lock, current, current);
 
   if (node == nullptr) {
     // We had no lock node before enter, this is a jni initiated lock.
@@ -1592,7 +1701,7 @@ void LockZSynchronizer::jni_exit(oop object, JavaThread* current) {
   }
 
   // Update and keep track of the jni locking state
-  const bool jni_initiated_lock = node->fast_lock().initiate_lock_from_jni();
+  const bool jni_initiated_lock = node->fast_lock().jni_initiated_lock();
   node->fast_lock().decrement_jni_lock_count();
 
   const bool is_recursive = !jni_initiated_lock || node->fast_lock().has_jni_lock_count();

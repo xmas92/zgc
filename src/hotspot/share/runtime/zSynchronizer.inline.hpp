@@ -50,7 +50,7 @@ inline oop LockZSynchronizer::handle_helper(Handle handle) {
   return handle();
 }
 
-template <bool notify_all, typename oopOrHandle, typename Scope>
+template <bool NotifyAll, typename oopOrHandle, typename Scope>
 inline void LockZSynchronizer::notify_in_scope(oopOrHandle& object, Scope&& scope, TRAPS) {
   NoSafepointVerifier no_safepoint_verifier;
   DEBUG_ONLY(VerifyNotify verify(object, THREAD);)
@@ -63,7 +63,7 @@ inline void LockZSynchronizer::notify_in_scope(oopOrHandle& object, Scope&& scop
   const auto slow = [&]() {
     Handle object_handle = handle_helper(object, THREAD);
     VerifyNotify verify(object_handle, THREAD);
-    slow_notify(object_handle, notify_all, THREAD);
+    slow_notify(object_handle, NotifyAll, THREAD);
   };
 
   scope(slow);
@@ -82,7 +82,7 @@ inline void LockZSynchronizer::enter_in_scope(oopOrHandle& object, BasicLock* lo
   const auto slow = [&]() {
     Handle object_handle = handle_helper(object, current);
     VerifyEnter verify(object_handle, lock, locking_thread);
-    slow_enter(object_handle, lock, locking_thread);
+    slow_enter<false>(object_handle, locking_thread);
   };
 
   scope(slow);

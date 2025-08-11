@@ -45,7 +45,9 @@ inline ObjectMonitor* ObjectSynchronizer::read_monitor(Thread* current, oop obj,
 inline void ObjectSynchronizer::enter(Handle obj, BasicLock* lock, JavaThread* current) {
   assert(current == Thread::current(), "must be");
 
-  if (LockingMode == LM_LIGHTWEIGHT) {
+  if (LockingMode == LM_LOCKZ) {
+    LockZSynchronizer::enter(obj, lock, current, current);
+  } else if (LockingMode == LM_LIGHTWEIGHT) {
     LightweightSynchronizer::enter(obj, lock, current);
   } else {
     enter_legacy(obj, lock, current);
@@ -53,6 +55,7 @@ inline void ObjectSynchronizer::enter(Handle obj, BasicLock* lock, JavaThread* c
 }
 
 inline bool ObjectSynchronizer::quick_enter(oop obj, BasicLock* lock, JavaThread* current) {
+  precond(LockingMode != LM_LOCKZ);
   assert(current->thread_state() == _thread_in_Java, "invariant");
   NoSafepointVerifier nsv;
   if (obj == nullptr) return false;       // Need to throw NPE
@@ -71,7 +74,9 @@ inline bool ObjectSynchronizer::quick_enter(oop obj, BasicLock* lock, JavaThread
 inline void ObjectSynchronizer::exit(oop object, BasicLock* lock, JavaThread* current) {
   current->dec_held_monitor_count();
 
-  if (LockingMode == LM_LIGHTWEIGHT) {
+    if (LockingMode == LM_LOCKZ) {
+    LockZSynchronizer::exit(object, lock, current);
+  } else if (LockingMode == LM_LIGHTWEIGHT) {
     LightweightSynchronizer::exit(object, lock, current);
   } else {
     exit_legacy(object, lock, current);
