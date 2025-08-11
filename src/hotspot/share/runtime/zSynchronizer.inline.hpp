@@ -71,13 +71,13 @@ inline void LockZSynchronizer::notify_in_scope(oopOrHandle& object, Scope&& scop
 
 template <typename oopOrHandle, typename Scope>
 inline void LockZSynchronizer::enter_in_scope(oopOrHandle& object, BasicLock* lock, JavaThread* locking_thread, JavaThread* current, Scope&& scope) {
-  NoSafepointVerifier no_safepoint_verifier;
-  DEBUG_ONLY(VerifyEnter verify(object, lock, locking_thread);)
-  if (fast_enter(handle_helper(object), lock, locking_thread)) {
-    return;
+  {
+    NoSafepointVerifier no_safepoint_verifier;
+    DEBUG_ONLY(VerifyEnter verify(object, lock, locking_thread);)
+    if (fast_enter(handle_helper(object), lock, locking_thread)) {
+      return;
+    }
   }
-
-  PauseNoSafepointVerifier pause(&no_safepoint_verifier);
 
   const auto slow = [&]() {
     Handle object_handle = handle_helper(object, current);

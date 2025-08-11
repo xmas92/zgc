@@ -128,8 +128,8 @@ struct LockZFastLock {
   oop _object;
   int _jni_lock_count;
 
-  NOT_CHECK_UNHANDLED_OOPS(constexpr) LockZFastLock() = default;
-  NOT_CHECK_UNHANDLED_OOPS(constexpr) explicit LockZFastLock(std::nullptr_t) : _object(nullptr), _jni_lock_count(0) {};
+  NOT_CHECK_UNHANDLED_OOPS(constexpr) LockZFastLock() : _object(nullptr), _jni_lock_count(0) {};
+  NOT_CHECK_UNHANDLED_OOPS(constexpr) explicit LockZFastLock(std::nullptr_t) : LockZFastLock() {};
   NOT_CHECK_UNHANDLED_OOPS(constexpr) explicit LockZFastLock(oop object) : _object(object), _jni_lock_count(0) {};
 
   void init() { *this = LockZFastLock(nullptr); }
