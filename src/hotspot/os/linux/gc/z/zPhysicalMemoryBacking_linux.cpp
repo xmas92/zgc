@@ -794,25 +794,23 @@ static void do_mremap(char* from, char* to, size_t size) {
   const size_t granule_size = ZGranuleSize;
   assert(size % granule_size == 0, "%zu", size);
 
-  char* old_addr = from;
-  char* new_addr = to;
-#if 1
-  if (mremap(old_addr, size, size, MREMAP_MAYMOVE | MREMAP_DONTUNMAP | MREMAP_FIXED, new_addr) == MAP_FAILED) {
+#if 0
+  if (mremap(from, size, size, MREMAP_MAYMOVE | MREMAP_DONTUNMAP | MREMAP_FIXED, to) == MAP_FAILED) {
     ZErrno err;
-    fatal("Failed to map memory (%s) " PTR_FORMAT ", " PTR_FORMAT ", %zu", err.to_string(), p2i(old_addr), p2i(new_addr), size);
+    fatal("Failed to map memory (%s) " PTR_FORMAT ", " PTR_FORMAT ", %zu", err.to_string(), p2i(from), p2i(to), size);
   }
 #else
-  for (char* const end = to + size; new_addr != end; new_addr += granule_size, old_addr += granule_size) {
+  for (char* new_addr = to, * old_addr = from, *const end = to + size; new_addr != end; new_addr += granule_size, old_addr += granule_size) {
     if (mremap(old_addr, granule_size, granule_size, MREMAP_MAYMOVE | MREMAP_DONTUNMAP | MREMAP_FIXED, new_addr) == MAP_FAILED) {
       ZErrno err;
       fatal("Failed to map memory (%s) " PTR_FORMAT ", " PTR_FORMAT, err.to_string(), p2i(old_addr), p2i(new_addr));
     }
   }
 #endif
-  const void* const res = mmap(old_addr, size, PROT_NONE, MAP_FIXED | MAP_ANONYMOUS | MAP_PRIVATE | MAP_NORESERVE, -1, 0);
+  const void* const res = mmap(from, size, PROT_NONE, MAP_FIXED | MAP_ANONYMOUS | MAP_PRIVATE | MAP_NORESERVE, -1, 0);
   if (res == MAP_FAILED) {
     ZErrno err;
-    fatal("Failed to map memory (%s) " PTR_FORMAT ", " PTR_FORMAT ", %zu", err.to_string(), p2i(old_addr), p2i(new_addr), size);
+    fatal("Failed to map memory (%s) " PTR_FORMAT ", " PTR_FORMAT ", %zu", err.to_string(), p2i(from), p2i(to), size);
   }
 }
 
