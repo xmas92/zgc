@@ -27,16 +27,36 @@
 #include "gc/z/zAddress.hpp"
 
 class ZErrno;
-
+class ZBackingRangeNode;
 class ZPhysicalMemoryBacking {
 private:
-  int      _fd;
-  size_t   _size;
-  uint64_t _filesystem;
-  size_t   _block_size;
-  size_t   _available;
-  char*    _physical_mapping;
-  bool     _initialized;
+  class AnonymousMemoryMode {
+  private:
+    volatile bool _vma_crossing_mremap_supported;
+    volatile bool _commit_in_backing_space;
+    volatile bool _use_madv_free_supported;
+  public:
+    AnonymousMemoryMode();
+
+    bool remap_whole_range() const;
+    bool commit_in_backing_space() const;
+    bool use_madv_free() const;
+
+    void set_vma_crossing_mremap_unsupported();
+    void commit_in_backing_space_failed();
+    void set_madv_free_unsupported();
+  };
+
+  int                                 _fd;
+  size_t                              _size;
+  uint64_t                            _filesystem;
+  size_t                              _block_size;
+  size_t                              _available;
+  char*                               _physical_mapping;
+  mutable ZBackingRangeNode* volatile _broken_physical_backing_head;
+  mutable volatile bool               _broken_physical_backing;
+  mutable AnonymousMemoryMode         _anonymous_memory_mode;
+  bool                                _initialized;
 
   static char* _reserved_anon_memory_mapping;
 
@@ -52,6 +72,16 @@ private:
   bool is_hugetlbfs() const;
   bool tmpfs_supports_transparent_huge_pages() const;
 
+  bool check_for_madv_free_support();
+  bool check_for_vma_crossing_mremap_support();
+
+  char* install_broken_physical_backing(zbacking_offset offset, size_t length, char* potential_new_backing_file = nullptr) const;
+  void commit_failed_in_backing_file(zbacking_offset offset, size_t length) const;
+  char* remap_failed_in_backing_file(zbacking_offset offset, size_t length) const;
+  bool remap_failed_in_heap(zaddress_unsafe addr, size_t length) const;
+
+  void do_mremap(char* from, char* to, size_t size) const;
+
   ZErrno fallocate_compat_mmap_hugetlbfs(zbacking_offset offset, size_t length, bool touch) const;
   ZErrno fallocate_compat_mmap_tmpfs(zbacking_offset offset, size_t length) const;
   ZErrno fallocate_compat_pwrite(zbacking_offset offset, size_t length) const;
@@ -65,6 +95,11 @@ private:
   bool commit_inner(zbacking_offset offset, size_t length) const;
   size_t commit_numa_preferred(zbacking_offset offset, size_t length, uint32_t numa_id) const;
   size_t commit_default(zbacking_offset offset, size_t length) const;
+
+  template <typename F>
+  void for_offset_length_do_inner(zbacking_offset offset, size_t length, F&& f) const;
+  template <typename F>
+  void for_offset_length_do(zbacking_offset offset, size_t length, F&& f) const;
 
 public:
   ZPhysicalMemoryBacking(size_t max_capacity);

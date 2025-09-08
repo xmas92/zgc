@@ -22,6 +22,7 @@
  */
 
 #include "gc/shared/gcLogPrecious.hpp"
+#include "gc/shared/gc_globals.hpp"
 #include "gc/z/zAddress.inline.hpp"
 #include "gc/z/zArray.inline.hpp"
 #include "gc/z/zErrno.hpp"
@@ -31,17 +32,19 @@
 #include "gc/z/zMountPoint_linux.hpp"
 #include "gc/z/zNUMA.inline.hpp"
 #include "gc/z/zPhysicalMemoryBacking_linux.hpp"
+#include "gc/z/zPhysicalMemoryManager.hpp"
+#include "gc/z/zRange.inline.hpp"
 #include "gc/z/zSyscall_linux.hpp"
 #include "hugepages.hpp"
 #include "logging/log.hpp"
+#include "memory/allocation.hpp"
+#include "nmt/memTag.hpp"
 #include "os_linux.hpp"
 #include "runtime/init.hpp"
 #include "runtime/os.hpp"
 #include "runtime/safefetch.hpp"
 #include "utilities/align.hpp"
 #include "utilities/debug.hpp"
-#include "utilities/growableArray.hpp"
-#include "utilities/vmError.hpp"
 
 #include <fcntl.h>
 #include <stdio.h>
@@ -131,6 +134,35 @@ static int z_fallocate_hugetlbfs_attempts = 3;
 static bool z_fallocate_supported = true;
 char* ZPhysicalMemoryBacking::_reserved_anon_memory_mapping = nullptr;
 
+ZPhysicalMemoryBacking::AnonymousMemoryMode::AnonymousMemoryMode()
+  : _vma_crossing_mremap_supported(true),
+    _commit_in_backing_space(true),
+    _use_madv_free_supported(true) {}
+
+bool ZPhysicalMemoryBacking::AnonymousMemoryMode::remap_whole_range() const {
+  return Atomic::load(&_vma_crossing_mremap_supported);
+}
+
+bool ZPhysicalMemoryBacking::AnonymousMemoryMode::commit_in_backing_space() const {
+  return Atomic::load(&_commit_in_backing_space);
+}
+
+bool ZPhysicalMemoryBacking::AnonymousMemoryMode::use_madv_free() const {
+  return Atomic::load(&_use_madv_free_supported);
+}
+
+void ZPhysicalMemoryBacking::AnonymousMemoryMode::set_vma_crossing_mremap_unsupported() {
+  Atomic::store(&_vma_crossing_mremap_supported, false);
+}
+
+void ZPhysicalMemoryBacking::AnonymousMemoryMode::commit_in_backing_space_failed() {
+  Atomic::store(&_commit_in_backing_space, false);
+}
+
+void ZPhysicalMemoryBacking::AnonymousMemoryMode::set_madv_free_unsupported() {
+  Atomic::store(&_use_madv_free_supported, false);
+}
+
 bool ZPhysicalMemoryBacking::reserve_anon_memory_mapping(size_t max_capacity) {
   _reserved_anon_memory_mapping = (char*)mmap(0, max_capacity, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE, -1, 0);
 
@@ -142,12 +174,214 @@ bool ZPhysicalMemoryBacking::reserve_anon_memory_mapping(size_t max_capacity) {
   return true;
 }
 
+bool ZPhysicalMemoryBacking::check_for_madv_free_support() {
+  if (!ZUncommit) {
+    // Cannot uncommit, should never free memery, so set madv_free as unsupported
+    _anonymous_memory_mode.set_madv_free_unsupported();
+
+    return true;
+  }
+
+  if (ZLargePages::is_explicit()) {
+    // madv free does not work for Huge TLB
+    _anonymous_memory_mode.set_madv_free_unsupported();
+
+    return true;
+  }
+
+  // Reserve some memory
+  const size_t size = ZGranuleSize;
+  void* const addr_start = mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  if (addr_start == MAP_FAILED) {
+    ZErrno err;
+    ZInitialize::error("mmap failed while checking for madv_free support (%s)", err.to_string());
+    return false;
+  }
+  // Page in memory
+  void* const addr_end = (char*)addr_start + size;
+  os::pretouch_memory(addr_start, addr_end);
+
+  // Try MADV_FREE
+  if (madvise(addr_start, size, MADV_FREE) == -1) {
+    ZErrno err;
+    log_debug_p(gc, init)("Heap Backing: MADV_FREE unsupported (%s)", err.to_string());
+    _anonymous_memory_mode.set_madv_free_unsupported();
+  } else {
+    assert(_anonymous_memory_mode.use_madv_free(), "should be default");
+    log_debug_p(gc, init)("Heap Backing: Using asynchronous uncommit MADV_FREE");
+  }
+
+  // Unmap the reservation (freeing memory is madvise failed)
+  if (munmap(addr_start, size) == -1) {
+    ZErrno err;
+    ZInitialize::error("munmap failed while checking for madv_free support (%s)", err.to_string());
+    return false;
+  }
+
+  return true;
+}
+
+bool ZPhysicalMemoryBacking::check_for_vma_crossing_mremap_support() {
+#define Z_CHECK_MAP_ERROR(function, fail_value, value, variable)                                                       \
+  do {                                                                                                                 \
+    if (value == fail_value) {                                                                                         \
+      ZErrno err;                                                                                                      \
+      ZInitialize::error(#function " failed while checking for mremap support (" #variable ") (%s)", err.to_string()); \
+      return false;                                                                                                    \
+    }                                                                                                                  \
+  } while (false)
+#define Z_CHECK_MMAP_ERROR(addr) Z_CHECK_MAP_ERROR(mmap, MAP_FAILED, addr, addr)
+#define Z_MUNMAP_AND_CHECK_ERROR(addr, size) Z_CHECK_MAP_ERROR(munmap, -1, (munmap(addr, size)), addr)
+
+  const size_t num_parts = 2;
+  const size_t part_size = ZGranuleSize;
+  const size_t full_size = num_parts * part_size;
+
+  // Reserve Two memory ranges
+  void* const addr_space_1 = mmap(nullptr, full_size, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE, -1, 0);
+  Z_CHECK_MMAP_ERROR(addr_space_1);
+  void* const addr_space_2 = mmap(nullptr, full_size, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE, -1, 0);
+  Z_CHECK_MMAP_ERROR(addr_space_2);
+
+  // Map, page in and remap all parts into addr_space_1
+  for (size_t i = 0; i < num_parts; i++) {
+    void* const addr_part_start = mmap(nullptr, part_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    Z_CHECK_MMAP_ERROR(addr_part_start);
+    void* const addr_part_end = (char*)addr_part_start + part_size;
+    os::pretouch_memory(addr_part_start, addr_part_end);
+    // Map them in reverse order in case memory order could facilitate VMA coalescing
+    const size_t move_to_part_index = num_parts - i - 1;
+    void* const move_to_addr = (char*)addr_space_1 + move_to_part_index * part_size;
+    if (mremap(addr_part_start, part_size, part_size, MREMAP_MAYMOVE | MREMAP_FIXED, move_to_addr) == MAP_FAILED) {
+      ZErrno err;
+      ZInitialize::error("mremap unexpectedly failed while checking for mremap support (%s)", err.to_string());
+      return false;
+    }
+  }
+
+  // Check if we can mremap the whole address space.
+  if (mremap(addr_space_1, full_size, full_size, MREMAP_MAYMOVE | MREMAP_FIXED | MREMAP_DONTUNMAP, addr_space_2) == MAP_FAILED) {
+    ZErrno err;
+    log_debug_p(gc, init)("Heap Backing: Using legacy mremap (%s)", err.to_string());
+    _anonymous_memory_mode.set_vma_crossing_mremap_unsupported();
+
+    // The kernel may have unmapped addr_space_2 on failure, we do not munmap as
+    // this process may have mmaped that that address space. We could try to
+    // re-mmap it and see. But instead we just leak this small no-reserved region.
+  } else {
+    log_debug_p(gc, init)("Heap Backing: Using new mremap");
+    assert(_anonymous_memory_mode.remap_whole_range(), "should be default");
+
+    // Unmap and free addr_space_2
+    Z_MUNMAP_AND_CHECK_ERROR(addr_space_2, full_size);
+  }
+
+  // Unmap and free addr_space_1
+  Z_MUNMAP_AND_CHECK_ERROR(addr_space_1, full_size);
+
+#undef Z_MUNMAP_AND_CHECK_ERROR
+#undef Z_CHECK_MMAP_ERROR
+#undef Z_CHECK_MAP_ERROR
+  return true;
+}
+
+using ZBackingRange = ZRange<zbacking_offset, zbacking_offset_end>;
+
+class ZBackingRangeNode : public CHeapObj<MemTag::mtGC> {
+private:
+  const ZBackingRange _range;
+  char* const _new_backing_file;
+  ZBackingRangeNode* _next;
+
+public:
+  ZBackingRangeNode(zbacking_offset offset, size_t length, char* new_backing_file)
+    : _range(offset, length),
+      _new_backing_file(new_backing_file),
+      _next(nullptr) {}
+
+  void set_next(ZBackingRangeNode* next) {
+    _next = next;
+  }
+
+  ZBackingRangeNode* next() const {
+    return  _next;
+  }
+
+  char* file_addr() const {
+    return _new_backing_file;
+  }
+
+  const ZBackingRange& range() const {
+    return _range;
+  }
+};
+
+template <typename F>
+void ZPhysicalMemoryBacking::for_offset_length_do_inner(zbacking_offset offset, size_t length, F&& f) const {
+  const ZBackingRange range(offset, length);
+
+  for (ZBackingRangeNode* next = Atomic::load_acquire(&_broken_physical_backing_head); next != nullptr; next = next->next()) {
+    const ZBackingRange& broken_range = next->range();
+    if (broken_range.overlaps(range)) {
+      const bool has_pre_range = range.start() < broken_range.start();
+      const bool has_post_range = range.end() > broken_range.end();
+
+      if (has_pre_range) {
+        // Handle pre range
+        const zbacking_offset start = range.start();
+        const zbacking_offset end = broken_range.start();
+        const size_t length = end - start;
+        for_offset_length_do_inner(start, length, f);
+      }
+
+      {
+        // Handle Overlap
+        const zbacking_offset start = MAX2(range.start(), broken_range.start());
+        const zbacking_offset_end end = MIN2(range.end(), broken_range.end());
+        const size_t offset_in_broken_range = start - broken_range.start();
+        const size_t length = end - start;
+        f(next->file_addr() + offset_in_broken_range, start, length);
+      }
+
+      if (has_post_range) {
+        // Handle post range
+        const zbacking_offset start = to_zbacking_offset(broken_range.end());
+        const zbacking_offset_end end = range.end();
+        const size_t length = end - start;
+        for_offset_length_do_inner(start, length, f);
+      }
+
+      return;
+    }
+  }
+
+  f(_physical_mapping + untype(range.start()), range.start(), range.size());
+  return;
+}
+
+template <typename F>
+void ZPhysicalMemoryBacking::for_offset_length_do(zbacking_offset offset, size_t length, F&& f) const {
+  // Only anonymous can get broken physical backing files.
+  postcond(is_anonymous());
+
+  if (!Atomic::load(&_broken_physical_backing)) {
+    // This thread has not observed any broken physical backings yet.
+    f(_physical_mapping + untype(offset), offset, length);
+    return;
+  }
+
+  for_offset_length_do_inner(offset, length, f);
+}
+
 ZPhysicalMemoryBacking::ZPhysicalMemoryBacking(size_t max_capacity)
   : _fd(-1),
     _filesystem(0),
     _block_size(0),
     _available(0),
     _physical_mapping(nullptr),
+    _broken_physical_backing_head(nullptr),
+    _broken_physical_backing(false),
+    _anonymous_memory_mode(),
     _initialized(false) {
 
   if (ZAnonymousMemoryBacking) {
@@ -158,6 +392,16 @@ ZPhysicalMemoryBacking::ZPhysicalMemoryBacking(size_t max_capacity)
     _block_size = ZGranuleSize;
 
     log_info_p(gc, init)("Heap Backing: Anonymous Memory");
+
+    if (!check_for_madv_free_support()) {
+      // Failed to check for MADV_FREE support
+      return;
+    }
+
+    if (!check_for_vma_crossing_mremap_support()) {
+      // Failed to check for mremap support
+      return;
+    }
 
     // Successfully initialized
     _initialized = true;
@@ -430,6 +674,87 @@ bool ZPhysicalMemoryBacking::tmpfs_supports_transparent_huge_pages() const {
   return access(ZFILENAME_SHMEM_ENABLED, R_OK) == 0;
 }
 
+char* ZPhysicalMemoryBacking::install_broken_physical_backing(zbacking_offset offset, size_t length, char* potential_new_backing_file) const {
+  // Our backing file is broken. Entering degenerate mode.
+  Atomic::store(&_broken_physical_backing, true);
+
+  char* const new_backing_file = potential_new_backing_file == nullptr
+      ? (char*)mmap(0, length, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE, -1, 0)
+      : potential_new_backing_file;
+
+  if (new_backing_file != MAP_FAILED) {
+    ZErrno err;
+    fatal("Failed to mmap (%s)", err.to_string());
+  }
+
+  ZBackingRangeNode* range_node = new ZBackingRangeNode(offset, length, new_backing_file);
+
+  ZBackingRangeNode* head = Atomic::load(&_broken_physical_backing_head);
+  for (;;) {
+    range_node->set_next(head);
+    ZBackingRangeNode* const prev_head = Atomic::cmpxchg(&_broken_physical_backing_head, head, range_node);
+    if (prev_head == head) {
+      // CAS succeeded
+      return new_backing_file;
+    }
+    head = prev_head;
+  }
+}
+
+void ZPhysicalMemoryBacking::commit_failed_in_backing_file(zbacking_offset offset, size_t length) const {
+  _anonymous_memory_mode.commit_in_backing_space_failed();
+
+  // Try to get address range back.
+  char* const lost_backing_addr = _physical_mapping + untype(offset);
+  char* const addr = (char*)mmap(lost_backing_addr, length, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE | MAP_FIXED_NOREPLACE, -1, 0);
+  if (addr == lost_backing_addr) {
+    // Got the backing file back. Nothing more to do.
+    return;
+  }
+
+  log_info_p(gc)("Backing file broken due to commit failure.");
+  // Old kernels without MAP_FIXED_NOREPLACE support may have interpreted addr as a hint, reuse it.
+  install_broken_physical_backing(offset, length, addr != MAP_FAILED ? addr : nullptr);
+}
+
+char* ZPhysicalMemoryBacking::remap_failed_in_backing_file(zbacking_offset offset, size_t length) const {
+  _anonymous_memory_mode.set_vma_crossing_mremap_unsupported();
+
+  // Try to get address range back.
+  char* const lost_backing_addr = _physical_mapping + untype(offset);
+  char* const addr = (char*)mmap(lost_backing_addr, length, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE | MAP_FIXED_NOREPLACE, -1, 0);
+  if (addr == lost_backing_addr) {
+    // Got the backing file back. Nothing more to do.
+    return lost_backing_addr;
+  }
+
+  log_info_p(gc)("Backing file broken due to remap failure.");
+  // Old kernels without MAP_FIXED_NOREPLACE support may have interpreted addr as a hint, reuse it.
+  return install_broken_physical_backing(offset, length, addr != MAP_FAILED ? addr : nullptr);
+}
+
+bool ZPhysicalMemoryBacking::remap_failed_in_heap(zaddress_unsafe addr, size_t length) const {
+  _anonymous_memory_mode.set_vma_crossing_mremap_unsupported();
+
+  // Try to get address range back.
+  char* const lost_heap_addr = (char*)untype(addr);
+  char* const new_addr = (char*)mmap(lost_heap_addr, length, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE | MAP_FIXED_NOREPLACE, -1, 0);
+  if (new_addr == lost_heap_addr) {
+    // Got the backing file back. Nothing more to do.
+    return true;
+  }
+
+  log_info_p(gc)("Heap address space lost.");
+  if (new_addr != MAP_FAILED) {
+    // Old kernels without MAP_FIXED_NOREPLACE support may have interpreted addr as a hint
+    if (munmap(new_addr, length) == -1) {
+      ZErrno err;
+      fatal("Failed to munmap (%s)", err.to_string());
+    }
+  }
+  return false;
+}
+
 ZErrno ZPhysicalMemoryBacking::fallocate_compat_mmap_hugetlbfs(zbacking_offset offset, size_t length, bool touch) const {
   // On hugetlbfs, mapping a file segment will fail immediately, without
   // the need to touch the mapped pages first, if there aren't enough huge
@@ -643,43 +968,60 @@ bool ZPhysicalMemoryBacking::commit_inner(zbacking_offset offset, size_t length)
                       untype(offset) / M, untype(to_zbacking_offset_end(offset, length)) / M, length / M);
 
   if (is_anonymous()) {
-#if 1
-    // Step 1: Try grabbing the memory in a way that commits the memory to the system
-    void* const res = mmap(0, length, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    if (res == MAP_FAILED) {
-      // Failed
-      ZErrno err;
-      log_error_p(gc)("Failed to commit memory (%s)", err.to_string());
-      return false;
-    }
+    size_t covered_size = 0;
+    size_t committed_size = 0;
+    bool commit_failed = false;
+    for_offset_length_do(offset, length, [&](char* file_addr, zbacking_offset partial_offset, size_t partial_length) {
+      covered_size += partial_length;
+      if (commit_failed) {
+        // We stop commiting on failure.
+        return;
+      }
 
-    // Madvise transparent huge pages
-    os::realign_memory((char*)res, length, ZGranuleSize);
+      if (_anonymous_memory_mode.commit_in_backing_space()) {
+        if (mmap(file_addr, partial_length, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0) == MAP_FAILED) {
+          ZErrno err;
+          log_error_p(gc)("Failed to commit memory (%s)", err.to_string());
+          commit_failed = true;
+          commit_failed_in_backing_file(partial_offset, partial_length);
+          return;
+        }
 
-    // Step 2: Once committing has finished, slot the memory into our file mapping. This will succeed.
-    void* const file_addr = _physical_mapping + untype(offset);
-    if (mremap(res, length, length, MREMAP_MAYMOVE | MREMAP_FIXED, file_addr) == MAP_FAILED) {
-      ZErrno err;
-      fatal("Failed to remap memory (%s)", err.to_string());
-    }
+        // Madvise transparent huge pages
+        os::realign_memory((char*)file_addr, partial_length, ZGranuleSize);
 
-    // Populate the first page fault
-    *(char*)file_addr = 0;
-#else
-    void* const file_addr = _physical_mapping + untype(offset);
-    if (mmap(file_addr, length, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0) == MAP_FAILED) {
-      ZErrno err;
-      fatal("Failed to commit memory (%s)", err.to_string());
-    }
+        // Populate the first page fault
+        *(char*)file_addr = 0;
+      } else {
+        // Step 1: Try grabbing the memory in a way that commits the memory to the system
+        void* const res = mmap(0, partial_length, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+        if (res == MAP_FAILED) {
+          // Failed
+          ZErrno err;
+          log_error_p(gc)("Failed to commit memory (%s)", err.to_string());
+          commit_failed = true;
+          return;
+        }
 
-    // Madvise transparent huge pages
-    os::realign_memory((char*)file_addr, length, ZGranuleSize);
+        // Madvise transparent huge pages
+        os::realign_memory((char*)res, partial_length, ZGranuleSize);
 
-    // Populate the first page fault
-    *(char*)file_addr = 0;
-#endif
+        // Step 2: Once committing has finished, slot the memory into our file mapping. This will succeed.
+        void* const file_addr = _physical_mapping + untype(offset);
+        if (mremap(res, partial_length, partial_length, MREMAP_MAYMOVE | MREMAP_FIXED, file_addr) == MAP_FAILED) {
+          ZErrno err;
+          fatal("Failed to remap memory (%s)", err.to_string());
+        }
 
-    return true;
+        // Populate the first page fault
+        *(char*)file_addr = 0;
+      }
+      committed_size += partial_length;
+    });
+    assert(covered_size == length, "must have covered whole range");
+
+    // TODO: Handle parital committed case.
+    return !commit_failed;
   }
 
 retry:
@@ -763,22 +1105,36 @@ size_t ZPhysicalMemoryBacking::uncommit(zbacking_offset offset, size_t length) c
   log_trace(gc, heap)("Uncommitting memory: %zuM-%zuM (%zuM)",
                       untype(offset) / M, untype(to_zbacking_offset_end(offset, length)) / M, length / M);
   if (is_anonymous()) {
-    // Uncommitting with MADV_FREE should be a bit cheaper then synchronously unmapping
-    void* const file_addr = _physical_mapping + untype(offset);
-#if 0
-    if (mprotect(file_addr, length, PROT_NONE) != 0) {
-      ZErrno err;
-      fatal("Failed to protect memory (%s) " PTR_FORMAT " PROT_NONE", err.to_string(), p2i(file_addr));
-    }
-    if (madvise(file_addr, length, MADV_FREE) != 0) {
-      return 0;
-    }
-#else
-    if (mmap(file_addr, length, PROT_NONE, MAP_FIXED | MAP_ANONYMOUS | MAP_PRIVATE | MAP_NORESERVE, -1, 0) == MAP_FAILED) {
-      ZErrno err;
-      fatal("Failed to protect memory (%s) " PTR_FORMAT " PROT_NON", err.to_string(), p2i(file_addr));
-    }
-#endif
+    size_t covered_size = 0;
+    size_t uncommitted_size = 0;
+    bool uncommit_failed = false;
+    for_offset_length_do(offset, length, [&](char* file_addr, zbacking_offset partial_offset, size_t partial_length) {
+      covered_size += partial_length;
+      if (uncommit_failed) {
+        // We stop uncommiting on failure.
+        return;
+      }
+
+      if (_anonymous_memory_mode.use_madv_free()) {
+        // Uncommitting with MADV_FREE should be a bit cheaper then synchronously unmapping
+        if (mprotect(file_addr, partial_length, PROT_NONE) != 0) {
+          ZErrno err;
+          fatal("Failed to protect memory (%s) " PTR_FORMAT " PROT_NONE", err.to_string(), p2i(file_addr));
+        }
+        if (madvise(file_addr, partial_length, MADV_FREE) != 0) {
+          uncommit_failed = true;
+          return;
+        }
+      } else {
+        if (mmap(file_addr, partial_length, PROT_NONE, MAP_FIXED | MAP_ANONYMOUS | MAP_PRIVATE | MAP_NORESERVE, -1, 0) == MAP_FAILED) {
+          ZErrno err;
+          fatal("Failed to protect memory (%s) " PTR_FORMAT " PROT_NON", err.to_string(), p2i(file_addr));
+        }
+      }
+      uncommitted_size += partial_length;
+    });
+    assert(covered_size == length, "must have covered whole range");
+    return uncommitted_size;
   } else {
     const ZErrno err = fallocate(true /* punch_hole */, offset, length);
     if (err) {
@@ -790,23 +1146,42 @@ size_t ZPhysicalMemoryBacking::uncommit(zbacking_offset offset, size_t length) c
   return length;
 }
 
-static void do_mremap(char* from, char* to, size_t size) {
+void ZPhysicalMemoryBacking::do_mremap(char* from, char* to, size_t size) const {
   const size_t granule_size = ZGranuleSize;
   assert(size % granule_size == 0, "%zu", size);
 
-#if 0
-  if (mremap(from, size, size, MREMAP_MAYMOVE | MREMAP_DONTUNMAP | MREMAP_FIXED, to) == MAP_FAILED) {
-    ZErrno err;
-    fatal("Failed to map memory (%s) " PTR_FORMAT ", " PTR_FORMAT ", %zu", err.to_string(), p2i(from), p2i(to), size);
-  }
-#else
-  for (char* new_addr = to, * old_addr = from, *const end = to + size; new_addr != end; new_addr += granule_size, old_addr += granule_size) {
-    if (mremap(old_addr, granule_size, granule_size, MREMAP_MAYMOVE | MREMAP_DONTUNMAP | MREMAP_FIXED, new_addr) == MAP_FAILED) {
+  if (_anonymous_memory_mode.remap_whole_range()) {
+    if (mremap(from, size, size, MREMAP_MAYMOVE | MREMAP_DONTUNMAP | MREMAP_FIXED, to) == MAP_FAILED) {
       ZErrno err;
-      fatal("Failed to map memory (%s) " PTR_FORMAT ", " PTR_FORMAT, err.to_string(), p2i(old_addr), p2i(new_addr));
+      log_error_p(gc)("Failed to map memory (%s) " PTR_FORMAT ", " PTR_FORMAT ", %zu", err.to_string(), p2i(from), p2i(to), size);
+      if (to >= _physical_mapping && to < _physical_mapping + _size) {
+        zbacking_offset offset = to_zbacking_offset((uintptr_t)(_physical_mapping - to));
+        char* const new_to = remap_failed_in_backing_file(offset, size);
+        // Retry with segmented mremap
+        assert(!_anonymous_memory_mode.remap_whole_range(), "should not attempt again");
+        do_mremap(from, new_to, size);
+      } else {
+        const zaddress_unsafe addr = to_zaddress_unsafe((uintptr_t)from);
+        if (remap_failed_in_heap(addr, size)) {
+          // Retry with segmented mremap
+          assert(!_anonymous_memory_mode.remap_whole_range(), "should not attempt again");
+          do_mremap(from, to, size);
+        } else {
+          // TODO: Unclear what to do here.
+          fatal("Lost heap address");
+        }
+      }
+      return;
+    }
+  } else {
+    for (char* new_addr = to, * old_addr = from, *const end = to + size; new_addr != end; new_addr += granule_size, old_addr += granule_size) {
+      if (mremap(old_addr, granule_size, granule_size, MREMAP_MAYMOVE | MREMAP_DONTUNMAP | MREMAP_FIXED, new_addr) == MAP_FAILED) {
+        ZErrno err;
+        fatal("Failed to map memory (%s) " PTR_FORMAT ", " PTR_FORMAT, err.to_string(), p2i(old_addr), p2i(new_addr));
+      }
     }
   }
-#endif
+
   const void* const res = mmap(from, size, PROT_NONE, MAP_FIXED | MAP_ANONYMOUS | MAP_PRIVATE | MAP_NORESERVE, -1, 0);
   if (res == MAP_FAILED) {
     ZErrno err;
@@ -816,16 +1191,12 @@ static void do_mremap(char* from, char* to, size_t size) {
 
 void ZPhysicalMemoryBacking::map(zaddress_unsafe addr, size_t size, zbacking_offset offset) const {
   if (is_anonymous()) {
-    char* const file_addr = _physical_mapping + untype(offset);
-    auto vm_on_error = make_vm_on_error([&](outputStream* st){
-      st->print_cr("CRASH");
-      st->print_cr("_physical_mapping: " PTR_FORMAT, p2i(_physical_mapping));
-      st->print_cr("file_addr: " PTR_FORMAT, p2i(file_addr));
-      st->print_cr("addr: " PTR_FORMAT, untype(addr));
-      st->print_cr("size: %zu", size);
-      st->print_cr("offset: %zu", untype(offset));
+    zaddress_unsafe next_addr = addr;
+    for_offset_length_do(offset, size, [&](char* file_addr, zbacking_offset partial_offset, size_t partial_size) {
+      do_mremap(file_addr, (char*)untype(next_addr), partial_size);
+      next_addr = next_addr + partial_size;
     });
-    do_mremap(file_addr, (char*)untype(addr), size);
+    assert(next_addr == addr + size, "must have covered whole range");
   } else {
     const void* const res = mmap((void*)untype(addr), size, PROT_READ|PROT_WRITE, MAP_FIXED|MAP_SHARED, _fd, untype(offset));
     if (res == MAP_FAILED) {
@@ -856,19 +1227,15 @@ void ZPhysicalMemoryBacking::unmap(zaddress_unsafe addr, size_t size) const {
 
 void ZPhysicalMemoryBacking::unmap_segment(zaddress_unsafe addr, size_t size, zbacking_offset offset) const {
   if (is_anonymous()) {
-    char* const file_addr = _physical_mapping + untype(offset);
-    auto vm_on_error = make_vm_on_error([&](outputStream* st){
-      st->print_cr("CRASH");
-      st->print_cr("_physical_mapping: " PTR_FORMAT, p2i(_physical_mapping));
-      st->print_cr("file_addr: " PTR_FORMAT, p2i(file_addr));
-      st->print_cr("addr: " PTR_FORMAT, untype(addr));
-      st->print_cr("size: %zu", size);
-      st->print_cr("offset: %zu", untype(offset));
+    zaddress_unsafe next_addr = addr;
+    for_offset_length_do(offset, size, [&](char* file_addr, zbacking_offset partial_offset, size_t partial_size) {
+      do_mremap((char*)untype(next_addr), file_addr, partial_size);
+      if (mprotect(file_addr, partial_size, PROT_READ | PROT_WRITE) != 0) {
+        ZErrno err;
+        fatal("Failed to protect memory (%s) " PTR_FORMAT " PROT_READ | PROT_WRITE", err.to_string(), p2i(file_addr));
+      }
+      next_addr = next_addr + partial_size;
     });
-    do_mremap((char*)untype(addr), file_addr, size);
-    if (mprotect(file_addr, size, PROT_READ | PROT_WRITE) != 0) {
-      ZErrno err;
-      fatal("Failed to protect memory (%s) " PTR_FORMAT " PROT_READ | PROT_WRITE", err.to_string(), p2i(file_addr));
-    }
+    assert(next_addr == addr + size, "must have covered whole range");
   }
 }

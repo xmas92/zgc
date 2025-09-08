@@ -298,12 +298,20 @@ inline zbacking_offset to_zbacking_offset(zbacking_index index) {
 
 // ZRange helper functions
 
+inline zbacking_offset to_start_type(zbacking_offset_end offset) {
+  return to_zbacking_offset(offset);
+}
+
 inline zoffset to_start_type(zoffset_end offset) {
   return to_zoffset(offset);
 }
 
 inline zbacking_index to_start_type(zbacking_index_end offset) {
   return to_zbacking_index(offset);
+}
+
+inline zbacking_offset_end to_end_type(zbacking_offset start, size_t size) {
+  return to_zbacking_offset_end(start, size);
 }
 
 inline zoffset_end to_end_type(zoffset start, size_t size) {

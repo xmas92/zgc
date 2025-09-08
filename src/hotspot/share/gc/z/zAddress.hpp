@@ -234,9 +234,9 @@ enum class zoffset             : uintptr_t { invalid = UINTPTR_MAX };
 enum class zoffset_end         : uintptr_t { invalid = UINTPTR_MAX };
 
 // - Physical memory segment offsets
-enum class zbacking_offset     : uintptr_t {};
+enum class zbacking_offset     : uintptr_t { invalid = UINTPTR_MAX };
 // Offsets including end of offset range
-enum class zbacking_offset_end : uintptr_t {};
+enum class zbacking_offset_end : uintptr_t { invalid = UINTPTR_MAX };
 
 // - Physical memory segment indicies
 enum class zbacking_index      : uint32_t { zero = 0, invalid = UINT32_MAX };
