@@ -1739,7 +1739,7 @@ void ZPageAllocator::heap_resized(size_t selected_capacity) {
       // If the surplus capacity isn't over 5% of the capacity, the point of
       // uncommitting heuristically seems questionable and might just cause
       // pointless fluctuation.
-      if (surplus_capacity > capacity / uncommit_fraction) {
+      if (ZUncommit && surplus_capacity > capacity / uncommit_fraction) {
         // Update memory worker target capacity
         mem_worker.request_shrink_capacity(requested_capacity);
       } else {
@@ -1783,6 +1783,9 @@ void ZPageAllocator::adjust_capacity(size_t used_soon) {
       // When memory usage is high, request uncommitting if possible
       mem_worker.request_shrink_capacity_granule();
     } else {
+      // When memory pressure is not high, stop targetless uncommit.
+      mem_worker.stop_shrink_capacity_granule();
+
       // When memory pressure is not high, try to commit memory ahead of mutators.
       const uint32_t numa_id = partition->numa_id();
       const size_t used_soon_share = ZNUMA::calculate_share(numa_id, used_soon);
@@ -2560,6 +2563,7 @@ void ZPageAllocator::truncate_heuristic_max_after_capacity_decrease() {
       continue;
     }
     const size_t current_max = current_max_capacity();
+    // TODO[Axel]: Should we really log this when uncommitting.
     log_debug(gc)("Forced to lower heap size from "
                   "%zuM(%.0f%%) to %zuM(%.0f%%)",
                   heuristic_max / M, percent_of(heuristic_max, current_max),

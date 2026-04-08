@@ -64,28 +64,25 @@ private:
   ZPartition* const   _partition;
   ZConditionLock      _lock;
   ZHeatingRequestTree _heating_requests;
-  Atomic<size_t>      _target_commit_capacity;
-  Atomic<size_t>      _target_uncommit_capacity;
-  Ticks               _uncommit_request_start;
+  size_t              _heating_request_bytes;
+  size_t              _target_commit_capacity;
+  size_t              _target_uncommit_capacity;
+  bool                _targetless_uncommit;
+  Ticks               _uncommit_request_time;
   bool                _stop;
   ZVirtualMemory      _currently_heating;
 
-  void await_start();
+  bool await_start();
   bool is_stop_requested();
   size_t commit_granule(size_t target_capacity);
   size_t uncommit_granule();
 
   size_t uncommit(size_t to_uncommit);
 
-  bool should_heat();
   bool has_heating_request();
-  bool has_uncommit_matured(Ticks now, uint64_t uncommit_delay, size_t requested_capacity);
-  void consume_grow_request(size_t new_capacity);
-  bool consume_shrink_request(size_t new_capacity, uint64_t uncommit_delay);
   void remove_heating_request_range(const ZVirtualMemory& vmem);
   ZVirtualMemory pop_heating_request();
   size_t process_heating_request();
-  bool peek();
 
   void verify_heating_requests();
 
@@ -101,6 +98,7 @@ public:
 
   // Heap resizing requests
   void stop_heap_resizing();
+  void stop_shrink_capacity_granule();
   void request_grow_capacity(size_t requested_capacity);
   void request_shrink_capacity(size_t requested_capacity);
   void request_shrink_capacity_granule();
