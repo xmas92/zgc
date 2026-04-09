@@ -695,7 +695,7 @@ public:
         _mode = Mode::UncommitTargetless;
       } else if (heating_request_bytes > 0) {
         _mode = Mode::Heat;
-        _init_target_capacity = _worker->_heating_request_bytes;
+        _init_target_capacity = heating_request_bytes;
       } else {
         _mode = Mode::Wait;
       }
@@ -863,7 +863,7 @@ public:
         // Is there other work?
         const size_t capacity = _worker->_partition->capacity();
         const size_t target_uncommit_capacity = _worker->_target_uncommit_capacity;
-        if (target_uncommit_capacity == 0 || capacity >= target_uncommit_capacity) {
+        if (target_uncommit_capacity == 0 || capacity <= target_uncommit_capacity) {
           // We are no longer uncommitting.
           return false;
         }
