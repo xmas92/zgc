@@ -202,6 +202,8 @@ void ZMemoryWorker::request_shrink_capacity_granule() {
   _lock.notify_all();
 }
 
+static constexpr uint64_t TargetUncommitMinDelay = 10;
+
 static bool has_targetless_uncommit_matured(Ticks now, Ticks since, uint64_t uncommit_delay) {
   precond(now != Ticks());
   precond(since != Ticks());
@@ -222,7 +224,7 @@ static bool has_targeted_uncommit_matured(Ticks now, Ticks since, uint64_t uncom
 
   // Long term shrinking as requested by a GC should shrink fairly quickly
   // regardless of memory pressure.
-  return elapsed >= MIN2(uint64_t(10), uncommit_delay);
+  return elapsed >= MIN2(TargetUncommitMinDelay, uncommit_delay);
 }
 
 void ZMemoryWorker::wake_up_if_uncommit_matured(uint64_t uncommit_delay) {
@@ -518,18 +520,22 @@ private:
     const bool targetless_uncommit = _worker->_targetless_uncommit;
 
     if (targetless_uncommit && has_targetless_uncommit_matured(_update_time, _worker->_uncommit_request_time, _uncommit_delay)) {
-      const size_t uncommit_size = _worker->uncommit_granule();
-      const size_t shrink_amount = MIN2(_current_target_capacity, uncommit_size);
+      const size_t min_capacity = _worker->_partition->_static_min_capacity;
+      if (_current_target_capacity > min_capacity) {
+        const size_t uncommit_size = _worker->uncommit_granule();
+        const size_t shrink_amount = MIN2(_current_target_capacity - min_capacity, uncommit_size);
 
-      // Shrink heuristic max.
-      _worker->_partition->_page_allocator->shrink_heuristic_max(shrink_amount);
-      log_debug(gc, heap)("Memory Worker (%d) Prevented Commit: %zuM(%.0f%%)",
-                          _worker->_id, shrink_amount / M,
-                          percent_of(shrink_amount, _current_target_capacity));
+        // Shrink heuristic max.
+        _worker->_partition->_page_allocator->shrink_heuristic_max(shrink_amount);
+        log_debug(gc, heap)("Memory Worker (%d) Prevented Commit: %zuM(%.0f%%)",
+                            _worker->_id, shrink_amount / M,
+                            percent_of(shrink_amount, _current_target_capacity));
 
-      _current_target_capacity -= shrink_amount;
-      if (_worker->_target_commit_capacity != 0) {
-        _worker->_target_commit_capacity -= MIN2(_worker->_target_commit_capacity, shrink_amount);
+        assert(_worker->_target_commit_capacity == _current_target_capacity,
+               "Should not have released the lock since update targets");
+        _current_target_capacity -= shrink_amount;
+        _worker->_target_commit_capacity -= shrink_amount;
+        _worker->_uncommit_request_time = _update_time;
       }
     }
 
@@ -654,6 +660,7 @@ public:
     const size_t target_uncommit_capacity = _worker->_target_uncommit_capacity;
     const bool targetless_uncommit = _worker->_targetless_uncommit;
     const size_t capacity = _worker->_partition->capacity();
+    const size_t min_capacity = _worker->_partition->_static_min_capacity;
 
     if (target_commit_capacity > 0 && capacity < target_commit_capacity) {
       // First priority is committing memory
@@ -668,7 +675,7 @@ public:
       postcond(target_commit_capacity == 0);
       _mode = Mode::Uncommit;
       _init_target_capacity = target_uncommit_capacity;
-    } else if (targetless_uncommit && ZUncommit && has_targetless_uncommit_matured(_init_time, _worker->_uncommit_request_time, _uncommit_delay)) {
+    } else if (targetless_uncommit && ZUncommit && capacity != min_capacity && has_targetless_uncommit_matured(_init_time, _worker->_uncommit_request_time, _uncommit_delay)) {
       // Third priority is uncommitting memory if a targetless uncommit matured
       postcond(ZAdaptive);
       postcond(target_commit_capacity == 0);
@@ -678,6 +685,14 @@ public:
       // Third priority (or first and only if not adapting) is heating memory
       _mode = Mode::Heat;
       _init_target_capacity = _worker->_heating_request_bytes;
+
+      // Ensure that we have no other targets
+      _worker->_target_commit_capacity = 0u;
+      _worker->_target_uncommit_capacity = 0u;
+
+      if (!targetless_uncommit) {
+        _worker->_uncommit_request_time = Ticks();
+      }
     }
 
     LogTarget(Debug, gc, heap) lt;
@@ -813,7 +828,7 @@ public:
 
       const auto get_wait_duration = [&]() -> uint64_t {
         ZUnlocker<ZConditionLock> unlocker(&_worker->_lock);
-        const uint64_t uncommit_delay = ZAdaptiveHeap::uncommit_delay();
+        const uint64_t uncommit_delay = MIN2(TargetUncommitMinDelay, ZAdaptiveHeap::uncommit_delay());
         const uint64_t time_since_uncommit = (Ticks::now() - _worker->_uncommit_request_time).milliseconds();
         if (uncommit_delay < time_since_uncommit) {
           return 0;
