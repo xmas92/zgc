@@ -63,6 +63,7 @@ ZMemoryWorker::ZMemoryWorker(uint32_t id, ZPartition* partition)
     _heating_request_bytes(0),
     _target_commit_capacity(0),
     _target_uncommit_capacity(0),
+    _targetless_uncommit(false),
     _uncommit_request_time(),
     _stop(false),
     _currently_heating() {
@@ -527,6 +528,9 @@ private:
                           percent_of(shrink_amount, _current_target_capacity));
 
       _current_target_capacity -= shrink_amount;
+      if (_worker->_target_commit_capacity != 0) {
+        _worker->_target_commit_capacity -= MIN2(_worker->_target_commit_capacity, shrink_amount);
+      }
     }
 
     const size_t commit_size = _worker->commit_granule(_current_target_capacity);
@@ -649,21 +653,22 @@ public:
     const size_t target_commit_capacity = _worker->_target_commit_capacity;
     const size_t target_uncommit_capacity = _worker->_target_uncommit_capacity;
     const bool targetless_uncommit = _worker->_targetless_uncommit;
+    const size_t capacity = _worker->_partition->capacity();
 
-    if (target_commit_capacity > 0) {
+    if (target_commit_capacity > 0 && capacity < target_commit_capacity) {
       // First priority is committing memory
       postcond(ZAdaptive);
       postcond(target_uncommit_capacity == 0);
       _mode = Mode::Commit;
       _init_target_capacity = target_commit_capacity;
-    } else if (target_uncommit_capacity > 0) {
+    } else if (target_uncommit_capacity > 0 && capacity > target_uncommit_capacity) {
       // Second priority is uncommitting memory
       postcond(ZAdaptive);
       postcond(ZUncommit);
       postcond(target_commit_capacity == 0);
       _mode = Mode::Uncommit;
       _init_target_capacity = target_uncommit_capacity;
-    } else if (targetless_uncommit  && ZUncommit && has_targetless_uncommit_matured(_init_time, _worker->_uncommit_request_time, _uncommit_delay)) {
+    } else if (targetless_uncommit && ZUncommit && has_targetless_uncommit_matured(_init_time, _worker->_uncommit_request_time, _uncommit_delay)) {
       // Third priority is uncommitting memory if a targetless uncommit matured
       postcond(ZAdaptive);
       postcond(target_commit_capacity == 0);
@@ -754,12 +759,12 @@ public:
       return try_commit();
     }
     case Mode::Uncommit: {
-      if (!has_targetless_uncommit_matured(_update_time, _worker->_uncommit_request_time, _uncommit_delay)) {
+      if (!has_targeted_uncommit_matured(_update_time, _worker->_uncommit_request_time, _uncommit_delay)) {
         // Await uncommit mature.
         return true;
       }
 
-      if (try_targetless_uncommit()) {
+      if (try_uncommit()) {
         // Set new uncommit request time
         _worker->_uncommit_request_time = _update_time;
         return true;
@@ -772,12 +777,12 @@ public:
       return false;
     }
     case Mode::UncommitTargetless: {
-      if (!has_targeted_uncommit_matured(_update_time, _worker->_uncommit_request_time, _uncommit_delay)) {
+      if (!has_targetless_uncommit_matured(_update_time, _worker->_uncommit_request_time, _uncommit_delay)) {
         // Await uncommit mature.
         return true;
       }
 
-      if (try_uncommit()) {
+      if (try_targetless_uncommit()) {
         // Set new uncommit request time
         _worker->_uncommit_request_time = _update_time;
         return true;

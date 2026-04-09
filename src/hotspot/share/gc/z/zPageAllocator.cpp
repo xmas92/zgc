@@ -2570,6 +2570,7 @@ void ZPageAllocator::truncate_heuristic_max_after_capacity_decrease() {
                   capacity / M, percent_of(capacity, current_max));
 
     if (ZAdaptive) {
+      // TODO: This should not happen on uncommit either.
       heap_truncated(capacity);
     }
     return;
