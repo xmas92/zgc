@@ -522,6 +522,9 @@ private:
     if (targetless_uncommit && has_targetless_uncommit_matured(_update_time, _worker->_uncommit_request_time, _uncommit_delay)) {
       const size_t min_capacity = _worker->_partition->_static_min_capacity;
       if (_current_target_capacity > min_capacity) {
+        // This might cause _current_target_capacity to undershoot the current capacity.
+        // So we might not uncommit the whole uncommit granule in this target capacity truncation.
+        // We allow this discrepancy.
         const size_t uncommit_size = _worker->uncommit_granule();
         const size_t shrink_amount = MIN2(_current_target_capacity - min_capacity, uncommit_size);
 
