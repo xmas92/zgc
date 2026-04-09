@@ -656,7 +656,9 @@ public:
     {
       ZUnlocker<ZConditionLock> unlocker(&_worker->_lock);
       _init_time = Ticks::now();
-      _uncommit_delay = ZAdaptiveHeap::uncommit_delay();
+      if (ZAdaptive) {
+        _uncommit_delay = ZAdaptiveHeap::uncommit_delay();
+      }
     }
 
     const size_t target_commit_capacity = _worker->_target_commit_capacity;
@@ -735,8 +737,10 @@ public:
 
     {
       ZUnlocker<ZConditionLock> unlocker(&_worker->_lock);
-      _uncommit_delay = ZAdaptiveHeap::uncommit_delay();
       _update_time = Ticks::now();
+      if (ZAdaptive) {
+        _uncommit_delay = ZAdaptiveHeap::uncommit_delay();
+      }
     }
 
     const bool targetless_uncommit = _worker->_targetless_uncommit;
