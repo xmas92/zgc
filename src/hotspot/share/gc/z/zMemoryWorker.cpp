@@ -679,34 +679,38 @@ public:
 
     const size_t target_commit_capacity = _worker->_target_commit_capacity;
     const size_t target_uncommit_capacity = _worker->_target_uncommit_capacity;
-    const bool targetless_uncommit = _worker->_targetless_uncommit;
     const size_t capacity = _worker->_partition->capacity();
     const size_t min_capacity = _worker->_partition->_static_min_capacity;
-    const size_t heating_request_bytes = _worker->_heating_request_bytes;
 
     if (target_commit_capacity > 0 && capacity < target_commit_capacity) {
       // First priority is committing memory
+
       postcond(ZAdaptive);
       postcond(target_uncommit_capacity == 0);
+
       _mode = Mode::Commit;
       _init_target_capacity = target_commit_capacity;
     } else if (target_uncommit_capacity > 0 && capacity > target_uncommit_capacity) {
       // Second priority is uncommitting memory
+
       postcond(ZAdaptive);
       postcond(ZUncommit);
       postcond(target_commit_capacity == 0);
+      postcond(target_uncommit_capacity >= min_capacity);
+
       _mode = Mode::Uncommit;
       _init_target_capacity = target_uncommit_capacity;
-    } else if (targetless_uncommit && ZUncommit && capacity != min_capacity &&
-               has_targetless_uncommit_matured(_init_time, _worker->_uncommit_request_time, _uncommit_delay)) {
-      // Third priority is uncommitting memory if a targetless uncommit matured
-      postcond(ZAdaptive);
-      postcond(target_commit_capacity == 0);
-      postcond(target_uncommit_capacity == 0);
-      _mode = Mode::UncommitTargetless;
     } else {
-      // Third priority (or first and only if not adapting) is heating memory
-      if (heating_request_bytes > 0) {
+      // Third priority is uncommitting memory if a targetless uncommit matured
+      // or heating memory if available.
+      const bool targetless_uncommit_matured = _worker->_targetless_uncommit && ZUncommit &&
+          has_targetless_uncommit_matured(_init_time, _worker->_uncommit_request_time, _uncommit_delay);
+      const size_t heating_request_bytes = _worker->_heating_request_bytes;
+
+      if (targetless_uncommit_matured && capacity != min_capacity) {
+        postcond(ZAdaptive);
+        _mode = Mode::UncommitTargetless;
+      } else if (heating_request_bytes > 0) {
         _mode = Mode::Heat;
         _init_target_capacity = _worker->_heating_request_bytes;
       } else {
@@ -934,7 +938,11 @@ public:
           return false;
         }
 
-        if (_worker->_targetless_uncommit) {
+        // If the capacity is already minimal, wait until something changes externally.
+        const size_t capacity = _worker->_partition->capacity();
+        const size_t min_capacity = _worker->_partition->_static_min_capacity;
+
+        if (_worker->_targetless_uncommit && capacity != min_capacity) {
           // There might be targetless uncommit work to be done.
           const uint64_t wait_duration = get_targetless_uncommit_wait_duration();
 
