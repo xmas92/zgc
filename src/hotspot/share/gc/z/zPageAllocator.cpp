@@ -1776,9 +1776,6 @@ void ZPageAllocator::adjust_capacity(size_t used_soon) {
   const ZMemoryPressureMetrics mem_metrics = ZAdaptiveHeap::memory_pressure_metrics();
   ZStatSystemMemoryUsage::record(mem_metrics);
 
-  const size_t total_capacity = capacity();
-  const uint64_t uncommit_delay = ZAdaptiveHeap::uncommit_delay(mem_metrics, total_capacity);
-
   ZPerNUMAIterator<ZPartition> iter = partition_iterator();
 
   for (ZPartition* partition; iter.next(&partition);) {
@@ -1799,8 +1796,6 @@ void ZPageAllocator::adjust_capacity(size_t used_soon) {
         mem_worker.request_grow_capacity(used_soon_share);
       }
     }
-
-    mem_worker.wake_up_if_uncommit_matured(uncommit_delay);
   }
 }
 

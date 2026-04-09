@@ -240,23 +240,6 @@ static bool has_targeted_uncommit_matured(Ticks now, Ticks since, uint64_t uncom
   return elapsed >= MIN2(TargetUncommitMinDelay, uncommit_delay);
 }
 
-void ZMemoryWorker::wake_up_if_uncommit_matured(uint64_t uncommit_delay) {
-  const Ticks now = Ticks::now();
-  ZLocker<ZConditionLock> locker(&_lock);
-
-  // Check targetless uncommit.
-  if (_targetless_uncommit && has_targetless_uncommit_matured(now, _uncommit_request_time, uncommit_delay)) {
-    _lock.notify_all();
-    return;
-  }
-
-  // Check targeted uncommit.
-  if (_target_uncommit_capacity != 0 && has_targeted_uncommit_matured(now, _uncommit_request_time, uncommit_delay)) {
-    _lock.notify_all();
-    return;
-  }
-}
-
 void ZMemoryWorker::remove_heating_request_range(const ZVirtualMemory& vmem) {
   ZArray<ZHeatingRequestNode*> to_remove;
 
