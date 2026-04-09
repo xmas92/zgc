@@ -1007,7 +1007,7 @@ size_t ZPartition::increase_and_commit_capacity(size_t size, size_t capacity_lim
     const size_t not_committed = commit_size - total_committed;
     decrease_capacity(not_committed);
     decrease_claimed(not_committed);
-    _page_allocator->truncate_heuristic_max_after_capacity_decrease();
+    _page_allocator->truncate_heuristic_max_after_capacity_decrease(ZPageAllocator::TruncationReason::CommitFailure);
   }
 
   // Free the memory, which puts it into the cache
@@ -1752,8 +1752,14 @@ void ZPageAllocator::heap_resized(size_t selected_capacity) {
   _physical.warn_commit_limits(selected_capacity, dynamic_max_capacity());
 }
 
-void ZPageAllocator::heap_truncated(size_t selected_capacity) {
+void ZPageAllocator::heap_truncated(size_t selected_capacity, ZPageAllocator::TruncationReason reason) {
   precond(ZAdaptive);
+
+  if (reason == TruncationReason::Uncommit) {
+    // Uncommit heap truncation is part of heap resizing.
+    return;
+  }
+  assert(reason == TruncationReason::CommitFailure, "Unexpected: %d", (int)reason);
 
   ZPerNUMAIterator<ZPartition> iter = partition_iterator();
   for (ZPartition* partition; iter.next(&partition);) {
@@ -2550,7 +2556,7 @@ void ZPageAllocator::shrink_heuristic_max(size_t shrink_amount) {
   }
 }
 
-void ZPageAllocator::truncate_heuristic_max_after_capacity_decrease() {
+void ZPageAllocator::truncate_heuristic_max_after_capacity_decrease(TruncationReason reason) {
   // Adjust heuristic max capacity to ensure GC tries to keep below current capacity
   const size_t capacity = ZPageAllocator::capacity();
 
@@ -2563,15 +2569,15 @@ void ZPageAllocator::truncate_heuristic_max_after_capacity_decrease() {
       continue;
     }
     const size_t current_max = current_max_capacity();
-    // TODO[Axel]: Should we really log this when uncommitting.
-    log_debug(gc)("Forced to lower heap size from "
-                  "%zuM(%.0f%%) to %zuM(%.0f%%)",
-                  heuristic_max / M, percent_of(heuristic_max, current_max),
-                  capacity / M, percent_of(capacity, current_max));
+    if (reason == TruncationReason::CommitFailure) {
+      log_debug(gc)("Forced to lower heap size from "
+                    "%zuM(%.0f%%) to %zuM(%.0f%%)",
+                    heuristic_max / M, percent_of(heuristic_max, current_max),
+                    capacity / M, percent_of(capacity, current_max));
+    }
 
     if (ZAdaptive) {
-      // TODO: This should not happen on uncommit either.
-      heap_truncated(capacity);
+      heap_truncated(capacity, reason);
     }
     return;
   }
@@ -2587,7 +2593,7 @@ void ZPageAllocator::free_after_alloc_page_failed(ZPageAllocation* allocation) {
   free_memory_alloc_failed(allocation);
 
   // Try not to commit too much again
-  truncate_heuristic_max_after_capacity_decrease();
+  truncate_heuristic_max_after_capacity_decrease(TruncationReason::CommitFailure);
 
   // Keep track of usage
   decrease_used(allocation->size());

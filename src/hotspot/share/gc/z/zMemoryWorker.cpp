@@ -1035,7 +1035,7 @@ size_t ZMemoryWorker::uncommit(size_t to_uncommit) {
   }
 
   if (flushed > 0) {
-    _partition->_page_allocator->truncate_heuristic_max_after_capacity_decrease();
+    _partition->_page_allocator->truncate_heuristic_max_after_capacity_decrease(ZPageAllocator::TruncationReason::Uncommit);
   }
 
   return flushed;
