@@ -86,6 +86,11 @@ private:
 
   void verify_heating_requests();
 
+  void set_targetless_uncommit(Ticks now);
+  void set_targeted_uncommit(size_t requested_capacity, Ticks now);
+  void clear_targetless_uncommit();
+  void clear_targeted_uncommit();
+
 protected:
   virtual void run_thread();
   virtual void terminate();
